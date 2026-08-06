@@ -1,6 +1,6 @@
 from datetime import date
 from email_parser import *
-from classifier import EmailClassifier
+from classifier import EmailClassifier, extract_course_details
 from dotenv import load_dotenv
 import imaplib
 import os
@@ -12,6 +12,7 @@ POST_EMAIL_API_URL = "http://127.0.0.1:8000/api/emails/ingest"
 POST_COURSEENTRY_API_URL = "http://127.0.0.1:8000/api/course-entries"
 GET_COURSES_API_URL = "http://127.0.0.1:8000/api/courses"
 IMAP_SERVER = "poczta.agh.edu.pl"
+CONFIRMATION_EMAIL = "szkolenia-noreply@informatyka.agh.edu.pl"
 IMAP_PORT = 993
 IMAP_USER: str = os.getenv("CDSI_EMAIL_USER", "")
 IMAP_PASSWORD: str = os.getenv("CDSI_EMAIL_PASSWORD", "")
@@ -73,7 +74,6 @@ def find_parent(mail: imaplib.IMAP4_SSL, references: list[str]) -> str | None:
 
     return None
 
-
 def process_emails():
     mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
     mail.login(IMAP_USER, IMAP_PASSWORD)
@@ -89,7 +89,7 @@ def process_emails():
         mail.logout()
         return
 
-    email_ids = messages[0].split()[-5:]
+    email_ids = messages[0].split()[-50:]
     print(f"Processing {len(email_ids)} new emails...")
 
     email_classifier = build_classifier()
@@ -109,11 +109,19 @@ def process_emails():
             print(f"Failed to process email with ID {e_id.decode()}: {status}")
             continue
 
-        if processed_email["sent_to"] != IMAP_USER:
+        if processed_email["sent_to"].lower() != IMAP_USER.lower():
             print(f"Email with ID {e_id.decode()} was not sent to the expected address. Skipping.")
+            print(f"Sent to: {processed_email['sent_to']}, Expected: {IMAP_USER}")
+            print()
             continue
 
-        classifier_email_data, classifier_course_data = email_classifier.classify_category(processed_email)
+        if processed_email["customer_email"].lower() == CONFIRMATION_EMAIL.lower():
+           course_details = extract_course_details(processed_email["body"])
+           classifier_email_data = None
+           course_data = course_details
+        else:
+            classifier_email_data = email_classifier.classify_category(processed_email)
+            course_data = None
 
         # for key, value in processed_email.items():
         #     if key == "body":
@@ -126,21 +134,22 @@ def process_emails():
         # if classifier_course_data is not None:
         #     for key, value in classifier_course_data.items():
         #         print(f"{key}: {value}")
+        if classifier_email_data is not None:
+            payload = processed_email | classifier_email_data | {"parent_message_provider_id": find_parent(mail, references)}
+            response = requests.post(POST_EMAIL_API_URL, json=payload)
+            print(f"Status: {response.status_code}")
+            print(f"Response: {response.json()}")
 
-        payload = processed_email | classifier_email_data | {"parent_message_provider_id": find_parent(mail, references)}
-        response = requests.post(POST_EMAIL_API_URL, json=payload)
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.json()}")
-
-        if classifier_course_data is not None:
-            payload = classifier_course_data | {"sent_at": processed_email["sent_at"]}
+        if course_data is not None:
+            payload = course_data | {"sent_at": processed_email["sent_at"]}
+            print(f"Posting course entry data: {payload}")
             response = requests.post(POST_COURSEENTRY_API_URL, json=payload)
             print(f"Status: {response.status_code}")
             print(f"Response: {response.json()}")
         
         print()
 
-    update_last_pull_date()
+    # update_last_pull_date()
     mail.logout()
 
 

@@ -1,5 +1,4 @@
 import re
-from pydantic import BaseModel, Field
 from openai import OpenAI
 from datetime import datetime
 
@@ -9,22 +8,14 @@ class EmailClassifier:
     def __init__(self, course_names: list[str]):
         self.course_names = course_names
 
-    def classify_category(self, process_result: dict) -> tuple[dict, dict | None]:
-        if process_result["customer_email"] == EmailClassifier.CONFIRMATION_EMAIL:
-            data = extract_course_details(process_result["body"])
-            classifier_data = {
-                "category": f"registered: {data['course_name']}",
-                "needs_response": False
-            }
-            return classifier_data, data
-
+    def classify_category(self, process_result: dict) -> dict[str, str | bool]:
         # return AIanalysis(self.course_names, process_result), None
         return {
             "category": "_".join(check_course_names(self.course_names, process_result)).lower() or "other",
             "needs_response": True
-        }, None
+        }
     
-    
+
 def check_course_names(course_names: list[str], process_result: dict) -> list[str]:
   subject = process_result["subject"].lower()
   body = process_result["body"].lower()
@@ -36,7 +27,6 @@ def check_course_names(course_names: list[str], process_result: dict) -> list[st
       found_courses.append(course)
 
   return found_courses
-
 
 
 def extract_course_details(text: str):

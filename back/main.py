@@ -124,13 +124,6 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
 
 @app.post("/api/course-entries", status_code=status.HTTP_201_CREATED)
 def add_course_entry(payload: CourseEntryRequest, db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter_by(email=payload.customer_email).first()
-    if not customer:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="customer not found"
-        )
-
     course = db.query(Course).filter_by(name=payload.course_name).first()
     if not course:
         raise HTTPException(
@@ -138,7 +131,14 @@ def add_course_entry(payload: CourseEntryRequest, db: Session = Depends(get_db))
             detail="course not found"
         )
 
-    
+    customer = db.query(Customer).filter_by(email=payload.customer_email).first()
+    if not customer:
+        customer = Customer(email=payload.customer_email)
+        db.add(customer)
+        db.flush()
+        print(f"Added customer {customer.email} | {customer.id}")
+
+
     course_entry = CourseEntry(
         customer_id = customer.id,
         course_id = course.id,
@@ -147,9 +147,10 @@ def add_course_entry(payload: CourseEntryRequest, db: Session = Depends(get_db))
     )
     db.add(course_entry)
     db.flush()
-    db.commit()
 
+    db.commit()
     return {
+        "customer_id": customer.id,
         "course_entry_id": course_entry.id,
         "course_id": course.id
     }
