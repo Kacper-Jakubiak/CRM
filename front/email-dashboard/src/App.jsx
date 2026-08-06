@@ -4,14 +4,13 @@ import './App.css';
 const API_BASE_URL = 'http://localhost:8000';
 
 // Helper component to display an email message with an expandable body and reply functionality
-function DisplayEmail({ msg, customerEmail }) {
+function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
   const [replyBody, setReplyBody] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [sending, setSending] = useState(false);
   const [needsResponse, setNeedsResponse] = useState(msg.needs_response);
 
-  // Use the explicitly passed customer email or fall back to properties if needed
-  const emailAddress = customerEmail || "Unknown";
+  const emailAddress = customerEmail || msg.customer_email || 'Unknown';
 
   const handleSendReply = async () => {
     if (!replyBody.trim()) return;
@@ -40,9 +39,21 @@ function DisplayEmail({ msg, customerEmail }) {
         method: 'PATCH',
       });
       
-      if (statusRes.ok) {
-        const data = await statusRes.json();
-        setNeedsResponse(data.needs_response);
+      if (!statusRes.ok) {
+        throw new Error('Failed to update message status');
+      }
+
+      // Fetch the fresh message state using the requested endpoint
+      const freshMsgRes = await fetch(`${API_BASE_URL}/api/messages/${msg.provider_message_id}`);
+      if (freshMsgRes.ok) {
+        const freshData = await freshMsgRes.json();
+        const updatedMessage = freshData.message;
+        
+        setNeedsResponse(updatedMessage.needs_response);
+
+        if (onMessageUpdate) {
+          onMessageUpdate({ ...msg, ...updatedMessage });
+        }
       }
 
       alert('Reply sent successfully!');
@@ -180,13 +191,18 @@ function App() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(email)}/history`);
-      const data = await response.json();
+      const [entriesRes, messagesRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(email)}/entries`),
+        fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(email)}/messages`)
+      ]);
+
+      const entriesData = await entriesRes.json();
+      const messagesData = await messagesRes.json();
 
       setCustomerHistory({
-        customer: data.customer || { email },
-        messages: data.messages || [],
-        course_entries: data.course_entries || []
+        customer: messagesData.customer || entriesData.customer || { email },
+        messages: messagesData.messages || [],
+        course_entries: entriesData.course_entries || []
       });
     } catch (err) {
       console.error('Error fetching customer history:', err);
@@ -204,11 +220,23 @@ function App() {
     setLoading(true);
 
     try {
-      const historyPromises = customers.map((c) =>
-        fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(c.customer_email)}/history`)
-          .then((res) => res.json())
-          .catch(() => ({ customer: c, messages: [], course_entries: [] }))
-      );
+      const historyPromises = customers.map(async (c) => {
+        try {
+          const [entriesRes, messagesRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(c.customer_email)}/entries`),
+            fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(c.customer_email)}/messages`)
+          ]);
+          const entriesData = await entriesRes.json();
+          const messagesData = await messagesRes.json();
+          return {
+            customer: messagesData.customer || entriesData.customer || c,
+            messages: messagesData.messages || [],
+            course_entries: entriesData.course_entries || []
+          };
+        } catch {
+          return { customer: c, messages: [], course_entries: [] };
+        }
+      });
 
       const results = await Promise.all(historyPromises);
       
@@ -218,7 +246,6 @@ function App() {
       results.forEach((res) => {
         const customerEmail = res.customer?.email;
         (res.messages || []).forEach((m) => {
-          // Attach customer_email to the message object if not present
           allMsgsMap.set(m.provider_message_id, { ...m, customer_email: customerEmail || m.customer_email });
         });
         (res.course_entries || []).forEach((e) => {
@@ -235,6 +262,30 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle updating a single message in state dynamically across views
+  const handleMessageUpdate = (updatedMsg) => {
+    setCourseData((prev) => ({
+      ...prev,
+      messages: prev.messages.map((m) => 
+        m.provider_message_id === updatedMsg.provider_message_id ? { ...m, ...updatedMsg } : m
+      )
+    }));
+
+    setCustomerHistory((prev) => ({
+      ...prev,
+      messages: prev.messages.map((m) => 
+        m.provider_message_id === updatedMsg.provider_message_id ? { ...m, ...updatedMsg } : m
+      )
+    }));
+
+    setAllCustomersData((prev) => ({
+      ...prev,
+      messages: prev.messages.map((m) => 
+        m.provider_message_id === updatedMsg.provider_message_id ? { ...m, ...updatedMsg } : m
+      )
+    }));
   };
 
   // Helper function to filter messages based on needs_response selection
@@ -370,7 +421,12 @@ function App() {
               ) : (
                 <ul style={{ marginTop: '10px' }}>
                   {filterMessages(courseData.messages).map((msg) => (
-                    <DisplayEmail key={msg.provider_message_id} msg={msg} customerEmail={msg.customer_email} />
+                    <DisplayEmail 
+                      key={msg.provider_message_id} 
+                      msg={msg} 
+                      customerEmail={msg.customer_email} 
+                      onMessageUpdate={handleMessageUpdate} 
+                    />
                   ))}
                 </ul>
               )}
@@ -403,7 +459,12 @@ function App() {
               ) : (
                 <ul style={{ marginTop: '10px' }}>
                   {filterMessages(customerHistory.messages).map((msg) => (
-                    <DisplayEmail key={msg.provider_message_id} msg={msg} customerEmail={customerHistory.customer?.email || selectedCustomer} />
+                    <DisplayEmail 
+                      key={msg.provider_message_id} 
+                      msg={msg} 
+                      customerEmail={customerHistory.customer?.email || selectedCustomer} 
+                      onMessageUpdate={handleMessageUpdate} 
+                    />
                   ))}
                 </ul>
               )}
@@ -450,7 +511,12 @@ function App() {
               ) : (
                 <ul style={{ marginTop: '10px' }}>
                   {filterMessages(allCustomersData.messages).map((msg) => (
-                    <DisplayEmail key={msg.provider_message_id} msg={msg} customerEmail={msg.customer_email} />
+                    <DisplayEmail 
+                      key={msg.provider_message_id} 
+                      msg={msg} 
+                      customerEmail={msg.customer_email} 
+                      onMessageUpdate={handleMessageUpdate} 
+                    />
                   ))}
                 </ul>
               )}

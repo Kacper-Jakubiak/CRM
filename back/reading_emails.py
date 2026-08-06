@@ -1,5 +1,5 @@
 from datetime import date
-from email_parser import process_email
+from email_parser import *
 from classifier import EmailClassifier
 from dotenv import load_dotenv
 import imaplib
@@ -47,6 +47,37 @@ def update_last_pull_date():
   today_str = date.today().strftime("%d-%b-%Y")
   with open(LAST_PULL_FILE, "w") as f:
     f.write(today_str)
+
+
+def find_parent(mail, processed_email):
+    """
+    Searches the IMAP Inbox for any ancestor message in the thread 
+    by checking the full References header chain.
+    """
+    references = processed_email.get("references")
+
+    if not references:
+        return None
+    
+    candidates = list(reversed(references.split()))
+
+    for msg_id in candidates:
+        clean_id = msg_id.strip("<>")
+        if not clean_id:
+            continue
+
+        status, search_data = mail.search(None, f'(HEADER Message-ID "{clean_id}")')
+        
+        if status == "OK" and search_data[0]:
+            found_ids = search_data[0].split()
+            if not found_ids:
+                continue
+            parent_e_id = found_ids[0]
+            _, msg_data = mail.fetch(parent_e_id, '(BODY.PEEK[HEADER.FIELDS (Message-ID)])')
+            
+            return extract_message_id(msg_data)
+
+    return None
 
 
 def process_emails():
@@ -98,7 +129,7 @@ def process_emails():
         #     for key, value in course_result.items():
         #         print(f"{key}: {value}")
 
-        payload = processed_email | classifier_result
+        payload = processed_email | classifier_result | {"parent_message_provider_id": find_parent(e_id)}
         response = requests.post(POST_EMAIL_API_URL, json=payload)
         print(f"Status: {response.status_code}")
         print(f"Response: {response.json()}")

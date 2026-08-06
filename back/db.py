@@ -32,7 +32,14 @@ class EmailMessage(Base):
     needs_response = Column(Boolean, default=False, nullable=False)
     category = Column(String, nullable=False)
     
+    thread_id = Column(Integer, ForeignKey("threads.id"), index=True, nullable=False)
+    parent_id = Column(Integer, ForeignKey("email_messages.id"), index=True, nullable=True)
+    
     customer = relationship("Customer")
+    thread = relationship("Thread", back_populates="messages")
+    
+    parent = relationship("EmailMessage", remote_side=[id], back_populates="replies")
+    replies = relationship("EmailMessage", back_populates="parent", cascade="all, delete")
 
 class CourseEntry(Base):
     __tablename__ = "course_entries"
@@ -45,5 +52,12 @@ class CourseEntry(Base):
 
     course = relationship("Course")
     customer = relationship("Customer")
+
+class Thread(Base):
+    __tablename__ = "threads"
+
+    id = Column(Integer, primary_key=True)
+    
+    messages = relationship("EmailMessage", back_populates="thread", cascade="all, delete-orphan")
 
 Base.metadata.create_all(bind=engine)

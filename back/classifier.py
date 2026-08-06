@@ -20,7 +20,7 @@ class EmailClassifier:
 
         return AIanalysis(self.course_names, process_result), None
     
-
+    
 def check_course_names(course_names: list[str], process_result: dict) -> list[str]:
   subject = process_result["subject"].lower()
   body = process_result.get["body"].lower()

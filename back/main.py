@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional
 
-from db import SessionLocal, Customer, EmailMessage, CourseEntry, Course
+from db import SessionLocal, Customer, EmailMessage, CourseEntry, Course, Thread
 from sending_emails import send_email
 
 app = FastAPI(title="Email CRM API")
@@ -33,6 +33,7 @@ class EmailIngestRequest(BaseModel):
     subject: str
     body: str
     sent_at: str
+    parent_message_provider_id: Optional[str]
 
 class CourseEntryRequest(BaseModel):
     customer_email: EmailStr
@@ -67,15 +68,6 @@ def add_course(course_name: str, db: Session = Depends(get_db)):
 
 @app.post("/api/emails/ingest", status_code=status.HTTP_201_CREATED)
 def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter_by(email=payload.customer_email).first()
-    if not customer:
-        customer = Customer(email=payload.customer_email)
-        print(f"Added customer {customer.email}")
-        db.add(customer)
-        db.flush()
-
-    sent_time = datetime.fromisoformat(payload.sent_at)
-
     message = db.query(EmailMessage).filter_by(provider_message_id=payload.provider_message_id).first()
     if message:
         raise HTTPException(
@@ -83,15 +75,44 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
             detail=f"Message {payload.provider_message_id} already exists"
         )
     
+    parent_id = None
+    thread_id = None
+
+    if payload.parent_message_provider_id:
+        parent = db.query(EmailMessage).filter_by(provider_message_id=payload.parent_message_provider_id).first()
+        if parent:
+            parent_id = parent.id
+            thread_id = parent.thread_id
+        else:
+            print(f"Warning: Parent message {payload.parent_message_provider_id} not found. Creating a new thread.")
+
+    if thread_id is None:
+        new_thread = Thread()
+        db.add(new_thread)
+        db.flush()
+        print(f"Added new thread {new_thread.id}")
+        thread_id = new_thread.id
+        
+    
+    customer = db.query(Customer).filter_by(email=payload.customer_email).first()
+    if not customer:
+        customer = Customer(email=payload.customer_email)
+        db.add(customer)
+        db.flush()
+        print(f"Added customer {customer.email} | {customer.id}")
+
+    
     message = EmailMessage(
         customer_id=customer.id,
         provider_message_id=payload.provider_message_id,
         sender=payload.customer_email,
         subject=payload.subject,
         body=payload.body,
-        sent_at=sent_time,
+        sent_at=datetime.fromisoformat(payload.sent_at),
         needs_response=payload.needs_response,
-        category=payload.category
+        category=payload.category,
+        parent_id=parent_id,
+        thread_id=thread_id
     )
     db.add(message)
     db.flush()
@@ -100,6 +121,8 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
     return {
         "customer_id": customer.id,
         "message_id": message.id,
+        "parent_id": message.parent_id,
+        "thread_id": message.thread_id,
         "needs_response": message.needs_response
     }
 
@@ -157,6 +180,16 @@ def get_courses(db: Session = Depends(get_db)):
         "courses": [
             {"course_id": course.id, "course_name": course.name} 
             for course in courses
+        ]
+    }
+
+@app.get("/api/customers")
+def get_customers(db: Session = Depends(get_db)):
+    customers = db.query(Customer).all()
+    return {
+        "customers": [
+            {"customer_id": c.id, "customer_email": c.email} 
+            for c in customers
         ]
     }
 
@@ -222,25 +255,54 @@ def get_messages_containing_course(course_name: str, db: Session = Depends(get_d
         ]
     }
 
-
-@app.get("/api/customers/{email}/history")
+@app.get("/api/customers/{email}/entries")
 def get_customer_history(email: str, db: Session = Depends(get_db)):
-    """Displays all messages and course entries connected to a user with the given email."""
+    """Displays all course entries connected to a user with the given email."""
     customer = db.query(Customer).filter_by(email=email).first()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer not found"
+        )
+    
+    course_entries = (
+        db.query(CourseEntry)
+        .options(joinedload(CourseEntry.course))
+        .filter(CourseEntry.customer_id == customer.id)
+        .all()
+    )
+
+    return {
+        "customer": {
+            "id": customer.id,
+            "email": customer.email
+        },
+        "course_entries": [
+            {
+                "course_entry_id": ce.id,
+                "course_name": ce.course.name,
+                "course_date": ce.course_date.isoformat(),
+                "sent_at": ce.sent_at.isoformat()
+            }
+            for ce in course_entries
+        ]
+    }
+
+
+@app.get("/api/customers/{email}/messages")
+def get_customer_history(email: str, db: Session = Depends(get_db)):
+    """Displays all messages connected to a user with the given email."""
+    customer = db.query(Customer).filter_by(email=email).first()
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer not found"
+        )
 
     messages = (
         db.query(EmailMessage)
         .filter(EmailMessage.customer_id == customer.id)
         .order_by(EmailMessage.sent_at.desc())
-        .all()
-    )
-
-    course_entries = (
-        db.query(CourseEntry)
-        .options(joinedload(CourseEntry.course))
-        .filter(CourseEntry.customer_id == customer.id)
         .all()
     )
 
@@ -258,28 +320,9 @@ def get_customer_history(email: str, db: Session = Depends(get_db)):
                 "needs_response": m.needs_response
             }
             for m in messages
-        ],
-        "course_entries": [
-            {
-                "course_entry_id": ce.id,
-                "course_name": ce.course.name,
-                "course_date": ce.course_date.isoformat(),
-                "sent_at": ce.sent_at.isoformat()
-            }
-            for ce in course_entries
         ]
     }
 
-
-@app.get("/api/customers")
-def get_customers(db: Session = Depends(get_db)):
-    customers = db.query(Customer).all()
-    return {
-        "customers": [
-            {"customer_id": c.id, "customer_email": c.email} 
-            for c in customers
-        ]
-    }
 
 @app.post("/api/send")
 def send(payload: EmailSendRequest):
@@ -298,7 +341,6 @@ def send(payload: EmailSendRequest):
 def get_message(provider_message_id: str, db: Session = Depends(get_db)):
     message = (
         db.query(EmailMessage)
-        .options(joinedload(EmailMessage.customer))
         .filter_by(provider_message_id=provider_message_id)
         .first()
     )
@@ -307,33 +349,57 @@ def get_message(provider_message_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Message not found")
 
     return {
-        "provider_message_id": message.provider_message_id,
-        "customer": {
-            "email": message.customer.email
-        },
         "message": {
+                "id": message.id,
+                "customer_id": message.customer_id,
                 "sender": message.sender,
                 "subject": message.subject,
                 "body": message.body,
-                "sent_at": message.sent_at.isoformat()
+                "sent_at": message.sent_at.isoformat(),
+                "needs_response": message.needs_response,
+                "category": message.category
         }
     }
 
-# @app.get("/api/unanswered")
-# def get_unanswered_messages(db: Session = Depends(get_db)):
-#     messages = (
-#         db.query(EmailMessage)
-#         .options(joinedload(EmailMessage.customer))
-#         .filter(EmailMessage.needs_response == True)
-#         .order_by(EmailMessage.sent_at.desc())
-#         .all()
-#     )
+@app.patch("/api/messages/{provider_message_id}/move")
+def move_message_to_thread(provider_message_id: str, new_parent_message_id: str, db: Session = Depends(get_db)):
+    """
+    Moves an email message and its entire downstream reply-chain subtree 
+    to a new thread based on the provider_message_id lookup.
+    """
+    message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
+    if not message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message not found"
+        )
+
+    parent_message = db.query(EmailMessage).filter_by(provider_message_id=new_parent_message_id).first()
+    if not parent_message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Parent message not found"
+        )
     
-#     return [
-#         {
-#             "provider_message_id": m.provider_message_id,
-#             "customer_email": m.customer.email,
-#             "sent_at": m.sent_at.isoformat()
-#         }
-#         for m in messages
-#     ]
+    new_thread_id = parent_message.thread_id
+
+    message.parent_id = parent_message.id
+
+    queue = [message.id]
+    all_affected_ids = []
+
+    while queue:
+        current_id = queue.pop(0)
+        all_affected_ids.append(current_id)
+        
+        replies = db.query(EmailMessage).filter_by(parent_id=current_id).all()
+        for reply in replies:
+            queue.append(reply.id)
+
+    db.query(EmailMessage).filter(EmailMessage.id.in_(all_affected_ids)).update(
+        {EmailMessage.thread_id: new_thread_id}, synchronize_session=False
+    )
+    
+    db.commit()
+
+    return {"detail": f"Successfully moved {len(all_affected_ids)} message(s) to thread {new_thread_id}"}

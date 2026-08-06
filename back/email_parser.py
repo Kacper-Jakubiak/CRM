@@ -36,3 +36,21 @@ def process_email(msg_data) -> tuple[str, dict]:
         "body": body,
         "sent_at": sent_at
     }
+
+def extract_message_id(msg_data) -> str:
+    """
+    Extracts the cleaned provider message ID from raw msg_data 
+    using the same email-parsing style as process_email.
+    """
+    email_bytes = None
+    for response_part in msg_data:
+        if isinstance(response_part, tuple):
+            email_bytes = response_part[1]
+            break
+    if email_bytes is None:
+        return ""
+
+    raw_msg = email.message_from_bytes(email_bytes, policy=default)
+    provider_message_id = str(raw_msg.get("Message-ID", "")).strip("<> ")
+    
+    return provider_message_id
