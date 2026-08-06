@@ -6,3 +6,4 @@ sqlalchemy
 requests
 playwright
 openai
+python-dotenv

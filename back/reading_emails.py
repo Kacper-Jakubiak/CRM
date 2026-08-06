@@ -3,12 +3,18 @@ import requests
 from datetime import date
 from email_parser import process_email
 from classifier import EmailClassifier
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 POST_EMAIL_API_URL = "http://127.0.0.1:8000/api/emails/ingest"
 POST_COURSEENTRY_API_URL = "http://127.0.0.1:8000/api/add_course_entry"
 GET_COURSES_API_URL = "http://127.0.0.1:8000/api/courses"
 IMAP_SERVER = "poczta.agh.edu.pl"
 IMAP_PORT = 993
+IMAP_USER = os.getenv("CDSI_EMAIL_USER")
+IMAP_PASSWORD = os.getenv("CDSI_EMAIL_PASSWORD")
 
 
 def build_classifier() -> EmailClassifier:
@@ -34,7 +40,7 @@ def process_emails():
         print("No new emails found.")
         return
 
-    email_ids = messages[0].split()[-20:]
+    email_ids = messages[0].split()[-5:]
     print(f"Processing {len(email_ids)} new emails...")
 
     email_classifier = build_classifier()

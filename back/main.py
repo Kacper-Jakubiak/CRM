@@ -3,8 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
+from typing import Optional
 
 from db import SessionLocal, Customer, EmailMessage, CourseEntry, Course
+from sending_emails import send_email
 
 app = FastAPI(title="Email CRM API")
 
@@ -37,6 +39,12 @@ class CourseEntryRequest(BaseModel):
     course_name: str
     course_date: str
     sent_at: str
+
+class EmailSendRequest(BaseModel):
+    recipient_email: EmailStr
+    subject: str
+    body: str
+    reply_message_id: Optional[str] = None
 
 @app.post("/api/emails/ingest")
 def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
@@ -183,7 +191,7 @@ def get_courses(db: Session = Depends(get_db)):
 
     return {
         "courses": [
-            {"course_id": course.id, "course_name": repr(course.name)} 
+            {"course_id": course.id, "course_name": course.name} 
             for course in courses
         ]
     }
@@ -308,3 +316,15 @@ def get_customers(db: Session = Depends(get_db)):
             for c in customers
         ]
     }
+
+@app.post("/api/send")
+def send(payload: EmailSendRequest):
+    status = send_email(
+        recipient_email=payload.recipient_email,
+        subject=payload.subject,
+        body=payload.body,
+        reply_message_id=payload.reply_message_id
+        )
+    if status != "OK":
+        raise HTTPException(status_code=500, detail=status)
+    return {}
