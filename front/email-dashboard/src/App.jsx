@@ -4,11 +4,14 @@ import './App.css';
 const API_BASE_URL = 'http://localhost:8000';
 
 // Helper component to display an email message with an expandable body and reply functionality
-function DisplayEmail({ msg, recipientEmail }) {
+function DisplayEmail({ msg, customerEmail }) {
   const [replyBody, setReplyBody] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [sending, setSending] = useState(false);
   const [needsResponse, setNeedsResponse] = useState(msg.needs_response);
+
+  // Use the explicitly passed customer email or fall back to properties if needed
+  const emailAddress = customerEmail || "Unknown";
 
   const handleSendReply = async () => {
     if (!replyBody.trim()) return;
@@ -21,7 +24,7 @@ function DisplayEmail({ msg, recipientEmail }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          recipient_email: recipientEmail || msg.customer_email,
+          recipient_email: emailAddress,
           subject: `Re: ${msg.subject || 'No Subject'}`,
           body: replyBody,
           reply_message_id: msg.provider_message_id
@@ -56,7 +59,7 @@ function DisplayEmail({ msg, recipientEmail }) {
   return (
     <li key={msg.provider_message_id} style={{ marginBottom: '15px', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
       <strong>Subject:</strong> {msg.subject} <br />
-      <strong>From / To:</strong> {msg.customer_email} <br />
+      <strong>Email:</strong> {emailAddress} <br />
       <strong>Date:</strong> {msg.sent_at ? new Date(msg.sent_at).toLocaleString() : ''} <br />
       <strong>Needs Response:</strong>{' '}
       <span style={{ color: needsResponse ? 'red' : 'green', fontWeight: 'bold' }}>
@@ -121,7 +124,7 @@ function App() {
   const [allCustomersData, setAllCustomersData] = useState({ messages: [], course_entries: [] });
   
   const [courseData, setCourseData] = useState({ entries: [], messages: [] });
-  const [customerHistory, setCustomerHistory] = useState({ messages: [], course_entries: [] });
+  const [customerHistory, setCustomerHistory] = useState({ customer: null, messages: [], course_entries: [] });
   const [loading, setLoading] = useState(false);
 
   // Filter state for messages ('all', 'true', 'false')
@@ -181,6 +184,7 @@ function App() {
       const data = await response.json();
 
       setCustomerHistory({
+        customer: data.customer || { email },
         messages: data.messages || [],
         course_entries: data.course_entries || []
       });
@@ -200,11 +204,10 @@ function App() {
     setLoading(true);
 
     try {
-      // Fetch messages and entries for all customers by looping through them or fetching all histories
       const historyPromises = customers.map((c) =>
         fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(c.customer_email)}/history`)
           .then((res) => res.json())
-          .catch(() => ({ messages: [], course_entries: [] }))
+          .catch(() => ({ customer: c, messages: [], course_entries: [] }))
       );
 
       const results = await Promise.all(historyPromises);
@@ -213,8 +216,14 @@ function App() {
       const allEntriesMap = new Map();
 
       results.forEach((res) => {
-        (res.messages || []).forEach((m) => allMsgsMap.set(m.provider_message_id, m));
-        (res.course_entries || []).forEach((e) => allEntriesMap.set(e.course_entry_id, e));
+        const customerEmail = res.customer?.email;
+        (res.messages || []).forEach((m) => {
+          // Attach customer_email to the message object if not present
+          allMsgsMap.set(m.provider_message_id, { ...m, customer_email: customerEmail || m.customer_email });
+        });
+        (res.course_entries || []).forEach((e) => {
+          allEntriesMap.set(e.course_entry_id, { ...e, customer_email: customerEmail || e.customer_email });
+        });
       });
 
       setAllCustomersData({
@@ -361,7 +370,7 @@ function App() {
               ) : (
                 <ul style={{ marginTop: '10px' }}>
                   {filterMessages(courseData.messages).map((msg) => (
-                    <DisplayEmail key={msg.provider_message_id} msg={msg} recipientEmail={msg.customer_email} />
+                    <DisplayEmail key={msg.provider_message_id} msg={msg} customerEmail={msg.customer_email} />
                   ))}
                 </ul>
               )}
@@ -394,7 +403,7 @@ function App() {
               ) : (
                 <ul style={{ marginTop: '10px' }}>
                   {filterMessages(customerHistory.messages).map((msg) => (
-                    <DisplayEmail key={msg.provider_message_id} msg={msg} recipientEmail={selectedCustomer} />
+                    <DisplayEmail key={msg.provider_message_id} msg={msg} customerEmail={customerHistory.customer?.email || selectedCustomer} />
                   ))}
                 </ul>
               )}
@@ -441,7 +450,7 @@ function App() {
               ) : (
                 <ul style={{ marginTop: '10px' }}>
                   {filterMessages(allCustomersData.messages).map((msg) => (
-                    <DisplayEmail key={msg.provider_message_id} msg={msg} recipientEmail={msg.customer_email} />
+                    <DisplayEmail key={msg.provider_message_id} msg={msg} customerEmail={msg.customer_email} />
                   ))}
                 </ul>
               )}

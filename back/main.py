@@ -46,7 +46,26 @@ class EmailSendRequest(BaseModel):
     body: str
     reply_message_id: Optional[str] = None
 
-@app.post("/api/emails/ingest")
+@app.post("/api/courses", status_code=status.HTTP_201_CREATED)
+def add_course(course_name: str, db: Session = Depends(get_db)):
+    existing_course = db.query(Course).filter_by(name=course_name).first()
+    if existing_course:
+        print(f"Course '{course_name}' already exists.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Course '{existing_course.name}' already exists."
+        )
+
+    course = Course(name=course_name)
+    db.add(course)
+    db.commit()
+    db.refresh(course)
+    
+    print(f"Successfully added course: {course_name}")
+    return {"course_id": course.id, "course_name": course.name}
+
+
+@app.post("/api/emails/ingest", status_code=status.HTTP_201_CREATED)
 def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
     customer = db.query(Customer).filter_by(email=payload.customer_email).first()
     if not customer:
@@ -59,7 +78,10 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
 
     message = db.query(EmailMessage).filter_by(provider_message_id=payload.provider_message_id).first()
     if message:
-        raise HTTPException(status_code=409, detail=f"Message {payload.provider_message_id} already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, 
+            detail=f"Message {payload.provider_message_id} already exists"
+        )
     
     message = EmailMessage(
         customer_id=customer.id,
@@ -82,15 +104,21 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
     }
 
 
-@app.post("/api/add_course_entry", status_code=status.HTTP_201_CREATED)
+@app.post("/api/course-entries", status_code=status.HTTP_201_CREATED)
 def add_course_entry(payload: CourseEntryRequest, db: Session = Depends(get_db)):
     customer = db.query(Customer).filter_by(email=payload.customer_email).first()
     if not customer:
-        raise HTTPException(status_code=404, detail="customer not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="customer not found"
+        )
 
     course = db.query(Course).filter_by(name=payload.course_name).first()
     if not course:
-        raise HTTPException(status_code=404, detail="course not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="course not found"
+        )
 
     
     course_entry = CourseEntry(
@@ -109,51 +137,6 @@ def add_course_entry(payload: CourseEntryRequest, db: Session = Depends(get_db))
     }
 
 
-@app.get("/api/unanswered")
-def get_unanswered_messages(db: Session = Depends(get_db)):
-    messages = (
-        db.query(EmailMessage)
-        .options(joinedload(EmailMessage.customer))
-        .filter(EmailMessage.needs_response == True)
-        .order_by(EmailMessage.sent_at.desc())
-        .all()
-    )
-    
-    return [
-        {
-            "provider_message_id": m.provider_message_id,
-            "customer_email": m.customer.email,
-            "sent_at": m.sent_at.isoformat()
-        }
-        for m in messages
-    ]
-
-
-@app.get("/api/messages/{provider_message_id}")
-def get_message(provider_message_id: str, db: Session = Depends(get_db)):
-    message = (
-        db.query(EmailMessage)
-        .options(joinedload(EmailMessage.customer))
-        .filter_by(provider_message_id=provider_message_id)
-        .first()
-    )
-    
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    return {
-        "provider_message_id": message.provider_message_id,
-        "customer": {
-            "email": message.customer.email
-        },
-        "message": {
-                "sender": message.sender,
-                "subject": message.subject,
-                "body": message.body,
-                "sent_at": message.sent_at.isoformat()
-        }
-    }
-
 
 @app.patch("/api/messages/{provider_message_id}/status")
 def update_message_status(provider_message_id: str, needs_response: bool, db: Session = Depends(get_db)):
@@ -164,25 +147,6 @@ def update_message_status(provider_message_id: str, needs_response: bool, db: Se
     message.needs_response = needs_response
     db.commit()
     return {"needs_response": message.needs_response}
-
-
-@app.post("/api/add_course", status_code=status.HTTP_201_CREATED)
-def add_course(course_name: str, db: Session = Depends(get_db)):
-    existing_course = db.query(Course).filter_by(name=course_name).first()
-    if existing_course:
-        print(f"Course '{course_name}' already exists.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Course '{existing_course.name}' already exists."
-        )
-
-    course = Course(name=course_name)
-    db.add(course)
-    db.commit()
-    db.refresh(course)
-    
-    print(f"Successfully added course: {course_name}")
-    return {"course_id": course.id, "course_name": course.name}
 
 
 @app.get("/api/courses",)
@@ -328,3 +292,48 @@ def send(payload: EmailSendRequest):
     if status != "OK":
         raise HTTPException(status_code=500, detail=status)
     return {}
+
+
+@app.get("/api/messages/{provider_message_id}")
+def get_message(provider_message_id: str, db: Session = Depends(get_db)):
+    message = (
+        db.query(EmailMessage)
+        .options(joinedload(EmailMessage.customer))
+        .filter_by(provider_message_id=provider_message_id)
+        .first()
+    )
+    
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {
+        "provider_message_id": message.provider_message_id,
+        "customer": {
+            "email": message.customer.email
+        },
+        "message": {
+                "sender": message.sender,
+                "subject": message.subject,
+                "body": message.body,
+                "sent_at": message.sent_at.isoformat()
+        }
+    }
+
+# @app.get("/api/unanswered")
+# def get_unanswered_messages(db: Session = Depends(get_db)):
+#     messages = (
+#         db.query(EmailMessage)
+#         .options(joinedload(EmailMessage.customer))
+#         .filter(EmailMessage.needs_response == True)
+#         .order_by(EmailMessage.sent_at.desc())
+#         .all()
+#     )
+    
+#     return [
+#         {
+#             "provider_message_id": m.provider_message_id,
+#             "customer_email": m.customer.email,
+#             "sent_at": m.sent_at.isoformat()
+#         }
+#         for m in messages
+#     ]

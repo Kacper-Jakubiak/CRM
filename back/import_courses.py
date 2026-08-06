@@ -1,7 +1,7 @@
 from playwright.sync_api import sync_playwright
 import requests
 
-ADD_COURSE_API_URL = "http://127.0.0.1:8000/api/add_course"
+ADD_COURSE_API_URL = "http://127.0.0.1:8000/api/courses"
 
 def add_courses(course_names: list[str]):
     for course_name in course_names:

@@ -19,30 +19,44 @@ class EmailClassifier:
             return classifier_data, data
 
         return AIanalysis(self.course_names, process_result), None
+    
 
-    @staticmethod
-    def extract_course_details(text: str):
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
+def check_course_names(course_names: list[str], process_result: dict) -> list[str]:
+  subject = process_result["subject"].lower()
+  body = process_result.get["body"].lower()
 
-        date_match = re.search(r'Termin:\s*(\d{2}\.\d{2}\.\d{4})', text)
+  found_courses = []
+  for course in course_names:
+    course_lower = course.lower()
+    if course_lower in subject or course_lower in body:
+      found_courses.append(course)
 
-        email_match = re.search(r'Email:\s*([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', text)
+  return found_courses
 
-        if not lines or not date_match or not email_match:
-            raise RuntimeError("Matching failed")
 
-        normalized_course_name = re.sub(r'\s+', ' ', lines[1]).strip()
-        print(repr(normalized_course_name))
 
-        date_obj = datetime.strptime(date_match.group(1), "%d.%m.%Y")
-        normalized_date = date_obj.date().isoformat()
-        print(normalized_date)
+def extract_course_details(text: str):
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
 
-        return {
-            "course_name": normalized_course_name,
-            "course_date": normalized_date,
-            "customer_email": email_match.group(1)
-        }
+    date_match = re.search(r'Termin:\s*(\d{2}\.\d{2}\.\d{4})', text)
+
+    email_match = re.search(r'Email:\s*([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', text)
+
+    if not lines or not date_match or not email_match:
+        raise RuntimeError("Matching failed")
+
+    normalized_course_name = re.sub(r'\s+', ' ', lines[1]).strip()
+    print(repr(normalized_course_name))
+
+    date_obj = datetime.strptime(date_match.group(1), "%d.%m.%Y")
+    normalized_date = date_obj.date().isoformat()
+    print(normalized_date)
+
+    return {
+        "course_name": normalized_course_name,
+        "course_date": normalized_date,
+        "customer_email": email_match.group(1)
+    }
     
 
 def AIanalysis(course_names: list[str], process_result: dict) -> dict:
