@@ -1,63 +1,69 @@
+from datetime import datetime
 from pathlib import Path
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, Text, func
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from typing import List
+
+from sqlalchemy import create_engine, ForeignKey, func, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 DB_PATH = Path(__file__).parent / "app.db"
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 class Customer(Base):
     __tablename__ = "customers"
 
-    id = Column(Integer, primary_key=True)
-    email = Column(String, unique=True, index=True, nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
 
 class Course(Base):
     __tablename__ = "courses"
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True, index=True, nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
 
 class EmailMessage(Base):
     __tablename__ = "email_messages"
     
-    id = Column(Integer, primary_key=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"), index=True, nullable=False)
-    provider_message_id = Column(String, unique=True, index=True, nullable=False)
-    sender = Column(String, nullable=False)
-    subject = Column(String, nullable=False)
-    body = Column(Text, nullable=False)
-    sent_at = Column(DateTime, default=func.now(), nullable=False)
-    needs_response = Column(Boolean, default=False, nullable=False)
-    category = Column(String, nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True, nullable=False)
+    provider_message_id: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
+    sender: Mapped[str] = mapped_column(nullable=False)
+    subject: Mapped[str] = mapped_column(nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(nullable=False)
+    needs_response: Mapped[bool] = mapped_column(nullable=False)
+    category: Mapped[str] = mapped_column(nullable=False)
     
-    thread_id = Column(Integer, ForeignKey("threads.id"), index=True, nullable=False)
-    parent_id = Column(Integer, ForeignKey("email_messages.id"), index=True, nullable=True)
+    thread_id: Mapped[int] = mapped_column(ForeignKey("threads.id"), index=True, nullable=False)
     
-    customer = relationship("Customer")
-    thread = relationship("Thread", back_populates="messages")
-    
-    parent = relationship("EmailMessage", remote_side=[id], back_populates="replies")
-    replies = relationship("EmailMessage", back_populates="parent", cascade="all, delete")
+    # Relationships
+    customer: Mapped["Customer"] = relationship("Customer")
+    thread: Mapped["Thread"] = relationship("Thread", back_populates="messages")
 
 class CourseEntry(Base):
     __tablename__ = "course_entries"
 
-    id = Column(Integer, primary_key=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"), index=True, nullable=False)
-    course_id = Column(Integer, ForeignKey("courses.id"), index=True, nullable=True)
-    course_date = Column(DateTime, nullable=True)
-    sent_at = Column(DateTime, default=func.now(), nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True, nullable=False)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True, nullable=False)
+    course_date: Mapped[datetime] = mapped_column(nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(default=func.now(), nullable=False)
 
-    course = relationship("Course")
-    customer = relationship("Customer")
+    # Relationships
+    course: Mapped["Course"] = relationship("Course")
+    customer: Mapped["Customer"] = relationship("Customer")
 
 class Thread(Base):
     __tablename__ = "threads"
 
-    id = Column(Integer, primary_key=True)
-    
-    messages = relationship("EmailMessage", back_populates="thread", cascade="all, delete-orphan")
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    # Relationship
+    messages: Mapped[List["EmailMessage"]] = relationship(
+        "EmailMessage", back_populates="thread", cascade="all, delete-orphan"
+    )
 
 Base.metadata.create_all(bind=engine)

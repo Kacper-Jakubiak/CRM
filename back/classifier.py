@@ -11,19 +11,23 @@ class EmailClassifier:
 
     def classify_category(self, process_result: dict) -> tuple[dict, dict | None]:
         if process_result["customer_email"] == EmailClassifier.CONFIRMATION_EMAIL:
-            data = self.extract_course_details(process_result["body"])
+            data = extract_course_details(process_result["body"])
             classifier_data = {
                 "category": f"registered: {data['course_name']}",
                 "needs_response": False
             }
             return classifier_data, data
 
-        return AIanalysis(self.course_names, process_result), None
+        # return AIanalysis(self.course_names, process_result), None
+        return {
+            "category": "_".join(check_course_names(self.course_names, process_result)).lower() or "other",
+            "needs_response": True
+        }, None
     
     
 def check_course_names(course_names: list[str], process_result: dict) -> list[str]:
   subject = process_result["subject"].lower()
-  body = process_result.get["body"].lower()
+  body = process_result["body"].lower()
 
   found_courses = []
   for course in course_names:
@@ -97,13 +101,14 @@ Needs Response: [True or False]
         
         category = "error"
         needs_response = True
-        
-        for line in content.split("\n"):
-            if line.lower().startswith("category:"):
-                category = line.split(":", 1)[1].strip()
-            elif line.lower().startswith("needs response:"):
-                val = line.split(":", 1)[1].strip().lower()
-                needs_response = "true" in val
+
+        if content:
+          for line in content.split("\n"):
+              if line.lower().startswith("category:"):
+                  category = line.split(":", 1)[1].strip()
+              elif line.lower().startswith("needs response:"):
+                  val = line.split(":", 1)[1].strip().lower()
+                  needs_response = "true" in val
 
         return {
             "category": category,

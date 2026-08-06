@@ -1,14 +1,14 @@
 from email.policy import default
 import email
 
-def process_email(msg_data) -> tuple[str, dict]:
+def process_email(msg_data) -> tuple[str, dict[str, str], list[str]]:
     email_bytes = None
     for response_part in msg_data:
         if isinstance(response_part, tuple):
             email_bytes = response_part[1]
             break
     if email_bytes is None:
-        return "None email_bytes", {}
+        return "None email_bytes", {}, []
 
     raw_msg = email.message_from_bytes(email_bytes, policy=default)
 
@@ -17,25 +17,36 @@ def process_email(msg_data) -> tuple[str, dict]:
 
     from_header = raw_msg.get("From")
     if not from_header or not hasattr(from_header, "addresses") or not from_header.addresses:
-        return "None from_header", {}
+        return "None from_header", {}, []
     customer_email = from_header.addresses[0].addr_spec
+
+    to_header = raw_msg.get("To")
+    if not to_header or not hasattr(to_header, "addresses") or not to_header.addresses:
+        return "None to_header", {}, []
+    sent_to = to_header.addresses[0].addr_spec
 
     date_header = raw_msg.get("Date")
     if not date_header:
-        return "None date_header", {}
+        return "None date_header", {}, []
     else:
         sent_at = date_header.datetime.isoformat()
 
     body_part = raw_msg.get_body(preferencelist=('plain', 'html'))
     body = body_part.get_content() if body_part else ""
 
+    references: list[str] = []
+    raw_refs = str(raw_msg.get("References", "")).strip()
+    if raw_refs:
+        references = [ref.strip("<> ") for ref in raw_refs.split() if ref.strip("<> ")]
+
     return "OK", {
         "provider_message_id": provider_message_id,
         "customer_email": customer_email,
+        "sent_to": sent_to,
         "subject": subject,
         "body": body,
         "sent_at": sent_at
-    }
+    }, references
 
 def extract_message_id(msg_data) -> str:
     """

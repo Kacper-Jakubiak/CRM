@@ -75,13 +75,10 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
             detail=f"Message {payload.provider_message_id} already exists"
         )
     
-    parent_id = None
     thread_id = None
-
     if payload.parent_message_provider_id:
         parent = db.query(EmailMessage).filter_by(provider_message_id=payload.parent_message_provider_id).first()
         if parent:
-            parent_id = parent.id
             thread_id = parent.thread_id
         else:
             print(f"Warning: Parent message {payload.parent_message_provider_id} not found. Creating a new thread.")
@@ -111,7 +108,6 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
         sent_at=datetime.fromisoformat(payload.sent_at),
         needs_response=payload.needs_response,
         category=payload.category,
-        parent_id=parent_id,
         thread_id=thread_id
     )
     db.add(message)
@@ -121,7 +117,6 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
     return {
         "customer_id": customer.id,
         "message_id": message.id,
-        "parent_id": message.parent_id,
         "thread_id": message.thread_id,
         "needs_response": message.needs_response
     }
@@ -256,7 +251,7 @@ def get_messages_containing_course(course_name: str, db: Session = Depends(get_d
     }
 
 @app.get("/api/customers/{email}/entries")
-def get_customer_history(email: str, db: Session = Depends(get_db)):
+def get_customer_entries(email: str, db: Session = Depends(get_db)):
     """Displays all course entries connected to a user with the given email."""
     customer = db.query(Customer).filter_by(email=email).first()
     if not customer:
@@ -290,7 +285,7 @@ def get_customer_history(email: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/customers/{email}/messages")
-def get_customer_history(email: str, db: Session = Depends(get_db)):
+def get_customer_messages(email: str, db: Session = Depends(get_db)):
     """Displays all messages connected to a user with the given email."""
     customer = db.query(Customer).filter_by(email=email).first()
     if not customer:
@@ -362,7 +357,7 @@ def get_message(provider_message_id: str, db: Session = Depends(get_db)):
     }
 
 @app.patch("/api/messages/{provider_message_id}/move")
-def move_message_to_thread(provider_message_id: str, new_parent_message_id: str, db: Session = Depends(get_db)):
+def move_message_to_thread(provider_message_id: str, new_thread_id: int, db: Session = Depends(get_db)):
     """
     Moves an email message and its entire downstream reply-chain subtree 
     to a new thread based on the provider_message_id lookup.
@@ -374,32 +369,26 @@ def move_message_to_thread(provider_message_id: str, new_parent_message_id: str,
             detail="Message not found"
         )
 
-    parent_message = db.query(EmailMessage).filter_by(provider_message_id=new_parent_message_id).first()
-    if not parent_message:
+    thread = db.query(Thread).filter_by(id=new_thread_id).first()
+    if not thread:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Parent message not found"
+            detail="Thread not found"
         )
-    
-    new_thread_id = parent_message.thread_id
 
-    message.parent_id = parent_message.id
+    old_thread_id = message.thread_id
+    if old_thread_id == new_thread_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Message is already in the specified thread"
+        )
 
-    queue = [message.id]
-    all_affected_ids = []
-
-    while queue:
-        current_id = queue.pop(0)
-        all_affected_ids.append(current_id)
-        
-        replies = db.query(EmailMessage).filter_by(parent_id=current_id).all()
-        for reply in replies:
-            queue.append(reply.id)
-
-    db.query(EmailMessage).filter(EmailMessage.id.in_(all_affected_ids)).update(
-        {EmailMessage.thread_id: new_thread_id}, synchronize_session=False
+    moved_count = db.query(EmailMessage).filter_by(thread_id=old_thread_id).update(
+        {EmailMessage.thread_id: new_thread_id}, 
+        synchronize_session=False
     )
-    
+
+    db.query(Thread).filter(Thread.id == old_thread_id).delete(synchronize_session=False)
     db.commit()
 
-    return {"detail": f"Successfully moved {len(all_affected_ids)} message(s) to thread {new_thread_id}"}
+    return {"detail": f"Successfully merged thread {old_thread_id} ({moved_count} messages) into thread {new_thread_id}."}

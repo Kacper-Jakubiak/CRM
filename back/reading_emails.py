@@ -13,12 +13,12 @@ POST_COURSEENTRY_API_URL = "http://127.0.0.1:8000/api/course-entries"
 GET_COURSES_API_URL = "http://127.0.0.1:8000/api/courses"
 IMAP_SERVER = "poczta.agh.edu.pl"
 IMAP_PORT = 993
-IMAP_USER = os.getenv("CDSI_EMAIL_USER")
-IMAP_PASSWORD = os.getenv("CDSI_EMAIL_PASSWORD")
+IMAP_USER: str = os.getenv("CDSI_EMAIL_USER", "")
+IMAP_PASSWORD: str = os.getenv("CDSI_EMAIL_PASSWORD", "")
 LAST_PULL_FILE = "last_email_pull.txt"
 
 
-def build_classifier() -> EmailClassifier:
+def build_classifier() -> EmailClassifier | None:
     response = requests.get(GET_COURSES_API_URL)
     if response.status_code != 200:
         print(f"Status: {response.status_code} | Response: {response.json()}")
@@ -49,33 +49,27 @@ def update_last_pull_date():
     f.write(today_str)
 
 
-def find_parent(mail, processed_email):
+def find_parent(mail: imaplib.IMAP4_SSL, references: list[str]) -> str | None:
     """
     Searches the IMAP Inbox for any ancestor message in the thread 
     by checking the full References header chain.
     """
-    references = processed_email.get("references")
-
     if not references:
         return None
-    
-    candidates = list(reversed(references.split()))
 
-    for msg_id in candidates:
-        clean_id = msg_id.strip("<>")
-        if not clean_id:
-            continue
 
-        status, search_data = mail.search(None, f'(HEADER Message-ID "{clean_id}")')
+    for msg_id in reversed(references):
+        status, search_data = mail.search(None, f'(HEADER Message-ID <{msg_id}>)')
         
-        if status == "OK" and search_data[0]:
-            found_ids = search_data[0].split()
-            if not found_ids:
-                continue
-            parent_e_id = found_ids[0]
-            _, msg_data = mail.fetch(parent_e_id, '(BODY.PEEK[HEADER.FIELDS (Message-ID)])')
-            
-            return extract_message_id(msg_data)
+        if not status == "OK" or not search_data[0]:
+            continue
+        found_ids = search_data[0].split()
+        if not found_ids:
+            continue
+        parent_e_id = found_ids[0]
+        _, msg_data = mail.fetch(parent_e_id, '(BODY.PEEK[HEADER.FIELDS (Message-ID)])')
+        
+        return extract_message_id(msg_data)
 
     return None
 
@@ -109,33 +103,37 @@ def process_emails():
             print(f"Failed to fetch email with ID {e_id.decode()}: {status}")
             continue
 
-        status, processed_email = process_email(msg_data)
+        status, processed_email, references = process_email(msg_data)
 
         if status != "OK":
             print(f"Failed to process email with ID {e_id.decode()}: {status}")
             continue
 
-        classifier_result, course_result = email_classifier.classify_category(processed_email)
+        if processed_email["sent_to"] != IMAP_USER:
+            print(f"Email with ID {e_id.decode()} was not sent to the expected address. Skipping.")
+            continue
+
+        classifier_email_data, classifier_course_data = email_classifier.classify_category(processed_email)
 
         # for key, value in processed_email.items():
         #     if key == "body":
         #         continue
         #     print(f"{key}: {value}")
         
-        # for key, value in classifier_result.items():
+        # for key, value in classifier_email_data.items():
         #     print(f"{key}: {value}")
 
-        # if course_result is not None:
-        #     for key, value in course_result.items():
+        # if classifier_course_data is not None:
+        #     for key, value in classifier_course_data.items():
         #         print(f"{key}: {value}")
 
-        payload = processed_email | classifier_result | {"parent_message_provider_id": find_parent(e_id)}
+        payload = processed_email | classifier_email_data | {"parent_message_provider_id": find_parent(mail, references)}
         response = requests.post(POST_EMAIL_API_URL, json=payload)
         print(f"Status: {response.status_code}")
         print(f"Response: {response.json()}")
 
-        if course_result is not None:
-            payload = course_result | {"sent_at": processed_email["sent_at"]}
+        if classifier_course_data is not None:
+            payload = classifier_course_data | {"sent_at": processed_email["sent_at"]}
             response = requests.post(POST_COURSEENTRY_API_URL, json=payload)
             print(f"Status: {response.status_code}")
             print(f"Response: {response.json()}")
