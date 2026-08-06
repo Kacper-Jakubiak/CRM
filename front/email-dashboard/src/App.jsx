@@ -3,14 +3,53 @@ import './App.css';
 
 const API_BASE_URL = 'http://localhost:8000';
 
-// Helper component to display an email message with an expandable body and reply functionality
+// Helper component to display an email message with an expandable body, manual toggle, and reply functionality
 function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
   const [replyBody, setReplyBody] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [sending, setSending] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState(false);
   const [needsResponse, setNeedsResponse] = useState(msg.needs_response);
 
+  // Sync state if prop updates externally
+  useEffect(() => {
+    setNeedsResponse(msg.needs_response);
+  }, [msg.needs_response]);
+
   const emailAddress = customerEmail || msg.customer_email || 'Unknown';
+
+  const handleToggleNeedsResponse = async () => {
+    const newStatus = !needsResponse;
+    setTogglingStatus(true);
+
+    try {
+      const statusRes = await fetch(
+        `${API_BASE_URL}/api/messages/${msg.provider_message_id}/status?needs_response=${newStatus}`,
+        { method: 'PATCH' }
+      );
+
+      if (!statusRes.ok) {
+        throw new Error('Failed to update message status');
+      }
+
+      const freshMsgRes = await fetch(`${API_BASE_URL}/api/messages/${msg.provider_message_id}`);
+      if (freshMsgRes.ok) {
+        const freshData = await freshMsgRes.json();
+        const updatedMessage = freshData.message;
+
+        setNeedsResponse(updatedMessage.needs_response);
+
+        if (onMessageUpdate) {
+          onMessageUpdate({ ...msg, ...updatedMessage });
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling status:', err);
+      alert('Failed to update status.');
+    } finally {
+      setTogglingStatus(false);
+    }
+  };
 
   const handleSendReply = async () => {
     if (!replyBody.trim()) return;
@@ -26,7 +65,7 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
           recipient_email: emailAddress,
           subject: `Re: ${msg.subject || 'No Subject'}`,
           body: replyBody,
-          reply_message_id: msg.provider_message_id
+          reply_message_id: msg.provider_message_id,
         }),
       });
 
@@ -35,20 +74,21 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
       }
 
       // Update message status needs_response to false after successful send
-      const statusRes = await fetch(`${API_BASE_URL}/api/messages/${msg.provider_message_id}/status?needs_response=false`, {
-        method: 'PATCH',
-      });
-      
+      const statusRes = await fetch(
+        `${API_BASE_URL}/api/messages/${msg.provider_message_id}/status?needs_response=false`,
+        { method: 'PATCH' }
+      );
+
       if (!statusRes.ok) {
         throw new Error('Failed to update message status');
       }
 
-      // Fetch the fresh message state using the requested endpoint
+      // Fetch the fresh message state
       const freshMsgRes = await fetch(`${API_BASE_URL}/api/messages/${msg.provider_message_id}`);
       if (freshMsgRes.ok) {
         const freshData = await freshMsgRes.json();
         const updatedMessage = freshData.message;
-        
+
         setNeedsResponse(updatedMessage.needs_response);
 
         if (onMessageUpdate) {
@@ -68,53 +108,105 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
   };
 
   return (
-    <li key={msg.provider_message_id} style={{ marginBottom: '15px', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
+    <li
+      key={msg.provider_message_id}
+      style={{
+        marginBottom: '15px',
+        borderBottom: '1px solid #ddd',
+        paddingBottom: '10px',
+        listStyle: 'none',
+      }}
+    >
       <strong>Subject:</strong> {msg.subject} <br />
       <strong>Email:</strong> {emailAddress} <br />
       <strong>Date:</strong> {msg.sent_at ? new Date(msg.sent_at).toLocaleString() : ''} <br />
       <strong>Needs Response:</strong>{' '}
       <span style={{ color: needsResponse ? 'red' : 'green', fontWeight: 'bold' }}>
         {needsResponse ? 'Yes' : 'No'}
-      </span> <br />
-      
-      <details style={{ marginTop: '5px', border: '1px solid #ccc', borderRadius: '4px', background: '#fff' }}>
+      </span>
+      <button
+        onClick={handleToggleNeedsResponse}
+        disabled={togglingStatus}
+        style={{
+          marginLeft: '10px',
+          padding: '2px 8px',
+          fontSize: '12px',
+          cursor: 'pointer',
+          borderRadius: '4px',
+          border: '1px solid #ccc',
+          background: '#f0f0f0',
+        }}
+      >
+        {togglingStatus ? 'Updating...' : `Mark as ${needsResponse ? 'No Response Needed' : 'Needs Response'}`}
+      </button>
+      <br />
+      <details style={{ marginTop: '8px', border: '1px solid #ccc', borderRadius: '4px', background: '#fff' }}>
         <summary style={{ padding: '8px 12px', cursor: 'pointer', background: '#f1f1f1', fontWeight: 'bold' }}>
           View Email Body
         </summary>
-        <div 
-          dangerouslySetInnerHTML={{ __html: msg.body }} 
+        <div
+          dangerouslySetInnerHTML={{ __html: msg.body }}
           style={{ padding: '10px', maxHeight: '300px', overflowY: 'auto' }}
         />
       </details>
-
       <div style={{ marginTop: '8px' }}>
         {!isReplying ? (
-          <button 
+          <button
             onClick={() => setIsReplying(true)}
-            style={{ padding: '4px 10px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            style={{
+              padding: '4px 10px',
+              background: '#007bff',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
           >
             Answer
           </button>
         ) : (
-          <div style={{ marginTop: '8px', padding: '10px', background: '#f9f9f9', border: '1px solid #ddd', borderRadius: '4px' }}>
-            <textarea 
-              rows="3" 
-              value={replyBody} 
-              onChange={(e) => setReplyBody(e.target.value)} 
+          <div
+            style={{
+              marginTop: '8px',
+              padding: '10px',
+              background: '#f9f9f9',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+            }}
+          >
+            <textarea
+              rows="3"
+              value={replyBody}
+              onChange={(e) => setReplyBody(e.target.value)}
               placeholder="Type your reply here..."
               style={{ width: '100%', padding: '6px', marginBottom: '6px', boxSizing: 'border-box' }}
             />
             <div>
-              <button 
-                onClick={handleSendReply} 
+              <button
+                onClick={handleSendReply}
                 disabled={sending}
-                style={{ padding: '4px 10px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '6px' }}
+                style={{
+                  padding: '4px 10px',
+                  background: '#28a745',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  marginRight: '6px',
+                }}
               >
                 {sending ? 'Sending...' : 'Send Reply'}
               </button>
-              <button 
+              <button
                 onClick={() => setIsReplying(false)}
-                style={{ padding: '4px 10px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                style={{
+                  padding: '4px 10px',
+                  background: '#6c757d',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
               >
                 Cancel
               </button>
@@ -126,6 +218,157 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
   );
 }
 
+// Component to handle thread rendering and merging logic per thread
+function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
+  const [targetThreadId, setTargetThreadId] = useState('');
+  const [moving, setMoving] = useState(false);
+
+  const representativeMsg = messages[0];
+
+  const handleMoveThread = async () => {
+    if (!targetThreadId.trim()) {
+      alert('Please enter a target Thread ID to merge into.');
+      return;
+    }
+
+    if (parseInt(targetThreadId, 10) === threadId) {
+      alert('Cannot move a thread into itself.');
+      return;
+    }
+
+    setMoving(true);
+    try {
+      const providerMsgId = representativeMsg.provider_message_id;
+      const res = await fetch(
+        `${API_BASE_URL}/api/messages/${providerMsgId}/move?new_thread_id=${encodeURIComponent(
+          targetThreadId
+        )}`,
+        { method: 'PATCH' }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to move thread');
+      }
+
+      const data = await res.json();
+      alert(data.detail || 'Thread merged successfully!');
+      setTargetThreadId('');
+
+      if (onThreadMoved) {
+        onThreadMoved();
+      }
+    } catch (err) {
+      console.error('Error merging thread:', err);
+      alert(`Error: ${err.message}`);
+    } finally {
+      setMoving(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        border: '1px solid #bce8f1',
+        borderRadius: '6px',
+        backgroundColor: '#f4fbfd',
+        marginBottom: '20px',
+        padding: '15px',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justify: 'space-between',
+          alignItems: 'center',
+          borderBottom: '1px solid #d9edf7',
+          paddingBottom: '10px',
+          marginBottom: '10px',
+        }}
+      >
+        <h4 style={{ margin: 0, color: '#31708f' }}>
+          Thread #{threadId !== undefined && threadId !== null ? threadId : 'Unassigned'} ({messages.length}{' '}
+          {messages.length === 1 ? 'message' : 'messages'})
+        </h4>
+
+        {/* Merge Thread Form */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <input
+            type="number"
+            placeholder="Target Thread ID"
+            value={targetThreadId}
+            onChange={(e) => setTargetThreadId(e.target.value)}
+            style={{ width: '130px', padding: '4px 6px', fontSize: '12px', borderRadius: '4px', border: '1px solid #ccc' }}
+          />
+          <button
+            onClick={handleMoveThread}
+            disabled={moving}
+            style={{
+              padding: '4px 10px',
+              fontSize: '12px',
+              backgroundColor: '#17a2b8',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            {moving ? 'Merging...' : 'Merge Thread'}
+          </button>
+        </div>
+      </div>
+
+      <ul style={{ paddingLeft: 0, margin: 0 }}>
+        {messages.map((msg) => (
+          <DisplayEmail
+            key={msg.provider_message_id}
+            msg={msg}
+            customerEmail={msg.customer_email}
+            onMessageUpdate={onMessageUpdate}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Helper component for rendering messages grouped by thread_id
+function MessageThreadList({ messages, messageFilter, onMessageUpdate, onThreadMoved }) {
+  const filteredMessages = messages.filter((msg) => {
+    if (messageFilter === 'true') return msg.needs_response === true;
+    if (messageFilter === 'false') return msg.needs_response === false;
+    return true;
+  });
+
+  if (filteredMessages.length === 0) {
+    return <p style={{ marginTop: '10px' }}>No messages found matching the filter.</p>;
+  }
+
+  // Group messages by thread_id
+  const groupedThreads = filteredMessages.reduce((acc, msg) => {
+    const threadId = msg.thread_id ?? 'unassigned';
+    if (!acc[threadId]) {
+      acc[threadId] = [];
+    }
+    acc[threadId].push(msg);
+    return acc;
+  }, {});
+
+  return (
+    <div style={{ marginTop: '15px' }}>
+      {Object.entries(groupedThreads).map(([tId, threadMsgs]) => (
+        <ThreadCard
+          key={tId}
+          threadId={tId === 'unassigned' ? 'Unassigned' : parseInt(tId, 10)}
+          messages={threadMsgs}
+          onMessageUpdate={onMessageUpdate}
+          onThreadMoved={onThreadMoved}
+        />
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const [courses, setCourses] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -133,7 +376,7 @@ function App() {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showAllCustomers, setShowAllCustomers] = useState(false);
   const [allCustomersData, setAllCustomersData] = useState({ messages: [], course_entries: [] });
-  
+
   const [courseData, setCourseData] = useState({ entries: [], messages: [] });
   const [customerHistory, setCustomerHistory] = useState({ customer: null, messages: [], course_entries: [] });
   const [loading, setLoading] = useState(false);
@@ -165,7 +408,7 @@ function App() {
     try {
       const [entriesRes, messagesRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseName)}/entries`),
-        fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseName)}/messages`)
+        fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseName)}/messages`),
       ]);
 
       const entriesData = await entriesRes.json();
@@ -173,7 +416,7 @@ function App() {
 
       setCourseData({
         entries: entriesData.course_entries || [],
-        messages: messagesData.messages || []
+        messages: messagesData.messages || [],
       });
     } catch (err) {
       console.error('Error fetching course details:', err);
@@ -193,7 +436,7 @@ function App() {
     try {
       const [entriesRes, messagesRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(email)}/entries`),
-        fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(email)}/messages`)
+        fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(email)}/messages`),
       ]);
 
       const entriesData = await entriesRes.json();
@@ -202,7 +445,7 @@ function App() {
       setCustomerHistory({
         customer: messagesData.customer || entriesData.customer || { email },
         messages: messagesData.messages || [],
-        course_entries: entriesData.course_entries || []
+        course_entries: entriesData.course_entries || [],
       });
     } catch (err) {
       console.error('Error fetching customer history:', err);
@@ -224,14 +467,14 @@ function App() {
         try {
           const [entriesRes, messagesRes] = await Promise.all([
             fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(c.customer_email)}/entries`),
-            fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(c.customer_email)}/messages`)
+            fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(c.customer_email)}/messages`),
           ]);
           const entriesData = await entriesRes.json();
           const messagesData = await messagesRes.json();
           return {
             customer: messagesData.customer || entriesData.customer || c,
             messages: messagesData.messages || [],
-            course_entries: entriesData.course_entries || []
+            course_entries: entriesData.course_entries || [],
           };
         } catch {
           return { customer: c, messages: [], course_entries: [] };
@@ -239,7 +482,7 @@ function App() {
       });
 
       const results = await Promise.all(historyPromises);
-      
+
       const allMsgsMap = new Map();
       const allEntriesMap = new Map();
 
@@ -255,7 +498,7 @@ function App() {
 
       setAllCustomersData({
         messages: Array.from(allMsgsMap.values()),
-        course_entries: Array.from(allEntriesMap.values())
+        course_entries: Array.from(allEntriesMap.values()),
       });
     } catch (err) {
       console.error('Error fetching all customers history:', err);
@@ -264,37 +507,39 @@ function App() {
     }
   };
 
+  // Refetch currently active view after merging threads
+  const refreshActiveView = () => {
+    if (selectedCourse) {
+      handleCourseClick(selectedCourse);
+    } else if (selectedCustomer) {
+      handleCustomerClick(selectedCustomer);
+    } else if (showAllCustomers) {
+      handleAllCustomersClick();
+    }
+  };
+
   // Handle updating a single message in state dynamically across views
   const handleMessageUpdate = (updatedMsg) => {
     setCourseData((prev) => ({
       ...prev,
-      messages: prev.messages.map((m) => 
+      messages: prev.messages.map((m) =>
         m.provider_message_id === updatedMsg.provider_message_id ? { ...m, ...updatedMsg } : m
-      )
+      ),
     }));
 
     setCustomerHistory((prev) => ({
       ...prev,
-      messages: prev.messages.map((m) => 
+      messages: prev.messages.map((m) =>
         m.provider_message_id === updatedMsg.provider_message_id ? { ...m, ...updatedMsg } : m
-      )
+      ),
     }));
 
     setAllCustomersData((prev) => ({
       ...prev,
-      messages: prev.messages.map((m) => 
+      messages: prev.messages.map((m) =>
         m.provider_message_id === updatedMsg.provider_message_id ? { ...m, ...updatedMsg } : m
-      )
+      ),
     }));
-  };
-
-  // Helper function to filter messages based on needs_response selection
-  const filterMessages = (messages) => {
-    return messages.filter((msg) => {
-      if (messageFilter === 'true') return msg.needs_response === true;
-      if (messageFilter === 'false') return msg.needs_response === false;
-      return true;
-    });
   };
 
   return (
@@ -302,7 +547,6 @@ function App() {
       <h1>Email CRM Dashboard</h1>
 
       <div className="dashboard-grid" style={{ display: 'flex', gap: '40px' }}>
-        
         {/* Left Column: Lists */}
         <div className="lists-column" style={{ flex: '1' }}>
           <section style={{ marginBottom: '30px' }}>
@@ -320,7 +564,7 @@ function App() {
                       color: selectedCourse === course.course_name ? '#fff' : '#000',
                       border: '1px solid #ccc',
                       borderRadius: '4px',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
                     }}
                   >
                     {course.course_name}
@@ -343,7 +587,7 @@ function App() {
                   borderRadius: '4px',
                   cursor: 'pointer',
                   fontWeight: 'bold',
-                  fontSize: '14px'
+                  fontSize: '14px',
                 }}
               >
                 All
@@ -362,7 +606,7 @@ function App() {
                       color: selectedCustomer === customer.customer_email ? '#fff' : '#000',
                       border: '1px solid #ccc',
                       borderRadius: '4px',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
                     }}
                   >
                     {customer.customer_email}
@@ -374,7 +618,10 @@ function App() {
         </div>
 
         {/* Right Column: Details View */}
-        <div className="details-column" style={{ flex: '2', background: '#fdfdfd', padding: '20px', border: '1px solid #eee', borderRadius: '6px' }}>
+        <div
+          className="details-column"
+          style={{ flex: '2', background: '#fdfdfd', padding: '20px', border: '1px solid #eee', borderRadius: '6px' }}
+        >
           {loading && <p>Loading details...</p>}
 
           {!loading && !selectedCourse && !selectedCustomer && !showAllCustomers && (
@@ -385,7 +632,7 @@ function App() {
           {!loading && selectedCourse && (
             <div>
               <h2>Course Details: {selectedCourse}</h2>
-              
+
               <h3>Entries</h3>
               {courseData.entries.length === 0 ? (
                 <p>No entries found for this course.</p>
@@ -401,11 +648,11 @@ function App() {
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-                <h3 style={{ margin: 0 }}>Related Messages</h3>
+                <h3 style={{ margin: 0 }}>Related Messages (By Thread)</h3>
                 <div>
                   <label style={{ fontSize: '14px', marginRight: '6px' }}>Filter:</label>
-                  <select 
-                    value={messageFilter} 
+                  <select
+                    value={messageFilter}
                     onChange={(e) => setMessageFilter(e.target.value)}
                     style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc' }}
                   >
@@ -416,20 +663,12 @@ function App() {
                 </div>
               </div>
 
-              {filterMessages(courseData.messages).length === 0 ? (
-                <p style={{ marginTop: '10px' }}>No messages found matching the filter.</p>
-              ) : (
-                <ul style={{ marginTop: '10px' }}>
-                  {filterMessages(courseData.messages).map((msg) => (
-                    <DisplayEmail 
-                      key={msg.provider_message_id} 
-                      msg={msg} 
-                      customerEmail={msg.customer_email} 
-                      onMessageUpdate={handleMessageUpdate} 
-                    />
-                  ))}
-                </ul>
-              )}
+              <MessageThreadList
+                messages={courseData.messages}
+                messageFilter={messageFilter}
+                onMessageUpdate={handleMessageUpdate}
+                onThreadMoved={refreshActiveView}
+              />
             </div>
           )}
 
@@ -439,11 +678,11 @@ function App() {
               <h2>Customer History: {selectedCustomer}</h2>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-                <h3 style={{ margin: 0 }}>Messages</h3>
+                <h3 style={{ margin: 0 }}>Messages (By Thread)</h3>
                 <div>
                   <label style={{ fontSize: '14px', marginRight: '6px' }}>Filter:</label>
-                  <select 
-                    value={messageFilter} 
+                  <select
+                    value={messageFilter}
                     onChange={(e) => setMessageFilter(e.target.value)}
                     style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc' }}
                   >
@@ -454,22 +693,14 @@ function App() {
                 </div>
               </div>
 
-              {filterMessages(customerHistory.messages).length === 0 ? (
-                <p style={{ marginTop: '10px' }}>No messages found matching the filter.</p>
-              ) : (
-                <ul style={{ marginTop: '10px' }}>
-                  {filterMessages(customerHistory.messages).map((msg) => (
-                    <DisplayEmail 
-                      key={msg.provider_message_id} 
-                      msg={msg} 
-                      customerEmail={customerHistory.customer?.email || selectedCustomer} 
-                      onMessageUpdate={handleMessageUpdate} 
-                    />
-                  ))}
-                </ul>
-              )}
+              <MessageThreadList
+                messages={customerHistory.messages}
+                messageFilter={messageFilter}
+                onMessageUpdate={handleMessageUpdate}
+                onThreadMoved={refreshActiveView}
+              />
 
-              <h3>Course Entries</h3>
+              <h3 style={{ marginTop: '20px' }}>Course Entries</h3>
               {customerHistory.course_entries.length === 0 ? (
                 <p>No course entries found for this customer.</p>
               ) : (
@@ -491,11 +722,11 @@ function App() {
               <h2>All Customers History</h2>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-                <h3 style={{ margin: 0 }}>All Messages</h3>
+                <h3 style={{ margin: 0 }}>All Messages (By Thread)</h3>
                 <div>
                   <label style={{ fontSize: '14px', marginRight: '6px' }}>Filter:</label>
-                  <select 
-                    value={messageFilter} 
+                  <select
+                    value={messageFilter}
                     onChange={(e) => setMessageFilter(e.target.value)}
                     style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc' }}
                   >
@@ -506,22 +737,14 @@ function App() {
                 </div>
               </div>
 
-              {filterMessages(allCustomersData.messages).length === 0 ? (
-                <p style={{ marginTop: '10px' }}>No messages found matching the filter.</p>
-              ) : (
-                <ul style={{ marginTop: '10px' }}>
-                  {filterMessages(allCustomersData.messages).map((msg) => (
-                    <DisplayEmail 
-                      key={msg.provider_message_id} 
-                      msg={msg} 
-                      customerEmail={msg.customer_email} 
-                      onMessageUpdate={handleMessageUpdate} 
-                    />
-                  ))}
-                </ul>
-              )}
+              <MessageThreadList
+                messages={allCustomersData.messages}
+                messageFilter={messageFilter}
+                onMessageUpdate={handleMessageUpdate}
+                onThreadMoved={refreshActiveView}
+              />
 
-              <h3>All Course Entries</h3>
+              <h3 style={{ marginTop: '20px' }}>All Course Entries</h3>
               {allCustomersData.course_entries.length === 0 ? (
                 <p>No course entries found.</p>
               ) : (
@@ -537,7 +760,6 @@ function App() {
               )}
             </div>
           )}
-
         </div>
       </div>
     </div>

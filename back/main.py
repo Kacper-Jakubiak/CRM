@@ -245,7 +245,8 @@ def get_messages_containing_course(course_name: str, db: Session = Depends(get_d
                 "subject": m.subject,
                 "body": m.body,
                 "sent_at": m.sent_at.isoformat(),
-                "needs_response": m.needs_response
+                "needs_response": m.needs_response,
+                "thread_id": m.thread_id
             }
             for m in messages
         ]
@@ -313,7 +314,8 @@ def get_customer_messages(email: str, db: Session = Depends(get_db)):
                 "subject": m.subject,
                 "body": m.body,
                 "sent_at": m.sent_at.isoformat(),
-                "needs_response": m.needs_response
+                "needs_response": m.needs_response,
+                "thread_id": m.thread_id
             }
             for m in messages
         ]
