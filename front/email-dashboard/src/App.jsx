@@ -137,7 +137,7 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
           background: '#f0f0f0',
         }}
       >
-        {togglingStatus ? 'Updating...' : `Mark as ${needsResponse ? 'No Response Needed' : 'Needs Response'}`}
+        {togglingStatus ? 'Updating...' : needsResponse ? 'Resolve' : 'Reopen'}
       </button>
       <br />
       <details style={{ marginTop: '8px', border: '1px solid #ccc', borderRadius: '4px', background: '#fff' }}>
@@ -344,22 +344,40 @@ function MessageThreadList({ messages, messageFilter, onMessageUpdate, onThreadM
     return <p style={{ marginTop: '10px' }}>No messages found matching the filter.</p>;
   }
 
-  // Group messages by thread_id
-  const groupedThreads = filteredMessages.reduce((acc, msg) => {
+  // 1. Group messages by thread_id using Map to preserve data integrity
+  const groupedMap = filteredMessages.reduce((acc, msg) => {
     const threadId = msg.thread_id ?? 'unassigned';
-    if (!acc[threadId]) {
-      acc[threadId] = [];
+    if (!acc.has(threadId)) {
+      acc.set(threadId, []);
     }
-    acc[threadId].push(msg);
+    acc.get(threadId).push(msg);
     return acc;
-  }, {});
+  }, new Map());
+
+  // 2. Format threads into an array & sort messages inside each thread (Newest top -> Oldest bottom)
+  const sortedThreads = Array.from(groupedMap.entries()).map(([tId, msgs]) => {
+    // Sort messages inside thread: Newest first
+    const sortedMsgs = [...msgs].sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
+    
+    // Index 0 is the newest message after sorting
+    const latestTimestamp = new Date(sortedMsgs[0].sent_at).getTime();
+
+    return {
+      threadId: tId,
+      messages: sortedMsgs,
+      latestTimestamp,
+    };
+  });
+
+  // 3. Sort threads by most recent activity (Newest threads on top)
+  sortedThreads.sort((a, b) => b.latestTimestamp - a.latestTimestamp);
 
   return (
     <div style={{ marginTop: '15px' }}>
-      {Object.entries(groupedThreads).map(([tId, threadMsgs]) => (
+      {sortedThreads.map(({ threadId, messages: threadMsgs }) => (
         <ThreadCard
-          key={tId}
-          threadId={tId === 'unassigned' ? 'Unassigned' : parseInt(tId, 10)}
+          key={threadId}
+          threadId={threadId === 'unassigned' ? 'Unassigned' : parseInt(threadId, 10)}
           messages={threadMsgs}
           onMessageUpdate={onMessageUpdate}
           onThreadMoved={onThreadMoved}

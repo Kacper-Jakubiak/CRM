@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import desc
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
@@ -179,6 +180,7 @@ def get_courses(db: Session = Depends(get_db)):
         ]
     }
 
+
 @app.get("/api/customers")
 def get_customers(db: Session = Depends(get_db)):
     customers = db.query(Customer).all()
@@ -188,6 +190,7 @@ def get_customers(db: Session = Depends(get_db)):
             for c in customers
         ]
     }
+
 
 @app.get("/api/courses/{course_name}/entries")
 def get_course_entries_by_course(course_name: str, db: Session = Depends(get_db)):
@@ -200,6 +203,7 @@ def get_course_entries_by_course(course_name: str, db: Session = Depends(get_db)
         db.query(CourseEntry)
         .options(joinedload(CourseEntry.customer))
         .filter_by(course_id=course.id)
+        .order_by(desc(CourseEntry.course_date))
         .all()
     )
 
@@ -215,6 +219,7 @@ def get_course_entries_by_course(course_name: str, db: Session = Depends(get_db)
             for ce in course_entries
         ]
     }
+
 
 @app.get("/api/courses/{course_name}/messages")
 def get_messages_containing_course(course_name: str, db: Session = Depends(get_db)):
@@ -252,6 +257,7 @@ def get_messages_containing_course(course_name: str, db: Session = Depends(get_d
         ]
     }
 
+
 @app.get("/api/customers/{email}/entries")
 def get_customer_entries(email: str, db: Session = Depends(get_db)):
     """Displays all course entries connected to a user with the given email."""
@@ -266,6 +272,7 @@ def get_customer_entries(email: str, db: Session = Depends(get_db)):
         db.query(CourseEntry)
         .options(joinedload(CourseEntry.course))
         .filter(CourseEntry.customer_id == customer.id)
+        .order_by(desc(CourseEntry.course_date))
         .all()
     )
 
