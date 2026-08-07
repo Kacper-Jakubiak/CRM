@@ -4,7 +4,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from db import SessionLocal, Customer, EmailMessage, CourseEntry, Course, Thread
 from sending_emails import send_email
@@ -36,11 +36,17 @@ class EmailIngestRequest(BaseModel):
     sent_at: str
     parent_message_provider_id: Optional[str]
 
+class EmailBatchIngestRequest(BaseModel):
+    messages: List[EmailIngestRequest]
+
 class CourseEntryRequest(BaseModel):
     customer_email: EmailStr
     course_name: str
     course_date: str
     sent_at: str
+
+class CourseEntryBatchRequest(BaseModel):
+    entries: List[CourseEntryRequest]
 
 class EmailSendRequest(BaseModel):
     recipient_email: EmailStr
@@ -67,7 +73,7 @@ def add_course(course_name: str, db: Session = Depends(get_db)):
     return {"course_id": course.id, "course_name": course.name}
 
 
-@app.post("/api/emails/ingest", status_code=status.HTTP_201_CREATED)
+@app.post("/api/emails", status_code=status.HTTP_201_CREATED)
 def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
     message = db.query(EmailMessage).filter_by(provider_message_id=payload.provider_message_id).first()
     if message:
@@ -123,6 +129,57 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
     }
 
 
+@app.post("/api/emails/batch", status_code=status.HTTP_201_CREATED)
+def batch_ingest_emails(payload: EmailBatchIngestRequest, db: Session = Depends(get_db)):
+    results = []
+    
+    for item in payload.messages:
+        existing_message = db.query(EmailMessage).filter_by(provider_message_id=item.provider_message_id).first()
+        if existing_message:
+            continue
+        
+        thread_id = None
+        if item.parent_message_provider_id:
+            parent = db.query(EmailMessage).filter_by(provider_message_id=item.parent_message_provider_id).first()
+            if parent:
+                thread_id = parent.thread_id
+
+        if thread_id is None:
+            new_thread = Thread()
+            db.add(new_thread)
+            db.flush()
+            thread_id = new_thread.id
+
+        customer = db.query(Customer).filter_by(email=item.customer_email).first()
+        if not customer:
+            customer = Customer(email=item.customer_email)
+            db.add(customer)
+            db.flush()
+
+        message = EmailMessage(
+            customer_id=customer.id,
+            provider_message_id=item.provider_message_id,
+            sender=item.customer_email,
+            subject=item.subject,
+            body=item.body,
+            sent_at=datetime.fromisoformat(item.sent_at),
+            needs_response=item.needs_response,
+            category=item.category,
+            thread_id=thread_id
+        )
+        db.add(message)
+        db.flush()
+        
+        results.append({
+            "provider_message_id": message.provider_message_id,
+            "message_id": message.id,
+            "thread_id": message.thread_id
+        })
+
+    db.commit()
+    return {"processed_count": len(results), "messages": results}
+
+
 @app.post("/api/course-entries", status_code=status.HTTP_201_CREATED)
 def add_course_entry(payload: CourseEntryRequest, db: Session = Depends(get_db)):
     course = db.query(Course).filter_by(name=payload.course_name).first()
@@ -157,6 +214,47 @@ def add_course_entry(payload: CourseEntryRequest, db: Session = Depends(get_db))
     }
 
 
+@app.post("/api/course-entries/batch", status_code=status.HTTP_201_CREATED)
+def add_course_entries_batch(payload: CourseEntryBatchRequest, db: Session = Depends(get_db)):
+    results = []
+    courses = []
+    
+    for item in payload.entries:
+        course = db.query(Course).filter_by(name=item.course_name).first()
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course '{item.course_name}' not found"
+            )
+        courses.append(course)
+
+    for item, course in zip(payload.entries, courses):
+        customer = db.query(Customer).filter_by(email=item.customer_email).first()
+        if not customer:
+            customer = Customer(email=item.customer_email)
+            db.add(customer)
+            db.flush()
+
+        course_entry = CourseEntry(
+            customer_id=customer.id,
+            course_id=course.id,
+            course_date=datetime.fromisoformat(item.course_date),
+            sent_at=datetime.fromisoformat(item.sent_at)
+        )
+        db.add(course_entry)
+        db.flush()
+
+        results.append({
+            "customer_id": customer.id,
+            "course_entry_id": course_entry.id,
+            "course_id": course.id
+        })
+
+    db.commit()
+    return {
+        "processed_count": len(results),
+        "course_entries": results
+    }
 
 @app.patch("/api/messages/{provider_message_id}/status")
 def update_message_status(provider_message_id: str, needs_response: bool, db: Session = Depends(get_db)):

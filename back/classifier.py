@@ -1,15 +1,12 @@
 import re
-from openai import OpenAI
 from datetime import datetime
+# import ollama
 
 class EmailClassifier:
-    CONFIRMATION_EMAIL = "szkolenia-noreply@informatyka.agh.edu.pl"
-
     def __init__(self, course_names: list[str]):
         self.course_names = course_names
 
     def classify_category(self, process_result: dict) -> dict[str, str | bool]:
-        # return AIanalysis(self.course_names, process_result), None
         return {
             "category": "_".join(check_course_names(self.course_names, process_result)).lower() or "other",
             "needs_response": True
@@ -53,61 +50,47 @@ def extract_course_details(text: str):
     }
     
 
-def AIanalysis(course_names: list[str], process_result: dict) -> dict:
-    client = OpenAI(
-        base_url="http://localhost:11434/v1",
-        api_key="ollama"
-    )
-    
-    subject = process_result.get("subject", "")
-    body = process_result.get("body", "")
-    sender = process_result.get("customer_email", "")
-    
-    courses_str = "\n".join([f"- {c}" for c in course_names])
+# def AIanalysis(process_result: dict) -> bool:
+#     """
+#     Classifies whether an email needs a response using local Gemma 4 (4B) via Ollama.
+#     """
+#     subject = process_result.get("subject", "")
+#     body = process_result.get("body", "")
+#     sender = process_result.get("customer_email", "")
 
-    prompt = f"""You are an email classifier. Read the email below and match it to ONE of the allowed courses, or output 'other' if it doesn't match any. Also decide if it needs a response (True or False).
+#     prompt = f"""You are an email classifier. Read the email below and decide if it needs a response. Answer in one word, "true" or "false".
 
-Allowed Courses:
-{courses_str}
+# Email Sender: {sender}
+# Email Subject: {subject}
+# Email Body:
+# {body}
+# """
 
-Email Sender: {sender}
-Email Subject: {subject}
-Email Body:
-{body}
+#     # Call the local Ollama instance running Gemma 4 4B
+#     response = ollama.chat(
+#         model='gemma4:e4b',
+#         messages=[
+#             {'role': 'user', 'content': prompt}
+#         ],
+#         options={
+#             'temperature': 0.0,      # Deterministic output for classification
+#             'num_predict': 10        # Keep response short
+#         }
+#     )
 
-Respond strictly in this format:
-Category: [Exact Course Name or generic]
-Needs Response: [True or False]
-"""
+#     # Extract response text
+#     response_text = response['message']['content'].strip().lower()
 
-    try:
-        response = client.chat.completions.create(
-            model="llama3",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0
-        )
+#     print(response_text)
+#     if "true" in response_text:
+#         return True
+#     return False
 
-        content = response.choices[0].message.content
-        
-        category = "error"
-        needs_response = True
+# if __name__ == "__main__":
+#    AI_result = AIanalysis({
+#       "subject": "Question",
+#       "body": "I need an urgent answer to my question. What is 1 + 1?",
+#       "customer_email": "test@email.com"
+#    })
 
-        if content:
-          for line in content.split("\n"):
-              if line.lower().startswith("category:"):
-                  category = line.split(":", 1)[1].strip()
-              elif line.lower().startswith("needs response:"):
-                  val = line.split(":", 1)[1].strip().lower()
-                  needs_response = "true" in val
-
-        return {
-            "category": category,
-            "needs_response": needs_response
-        }
-
-    except Exception as e:
-        print(f"Local AI analysis error: {e}")
-        return {
-            "category": "error",
-            "needs_response": True
-        }
+#    print(AI_result)

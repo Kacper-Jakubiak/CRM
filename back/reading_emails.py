@@ -8,8 +8,10 @@ import requests
 
 load_dotenv()
 
-POST_EMAIL_API_URL = "http://127.0.0.1:8000/api/emails/ingest"
-POST_COURSEENTRY_API_URL = "http://127.0.0.1:8000/api/course-entries"
+# POST_EMAIL_API_URL = "http://127.0.0.1:8000/api/emails"
+# POST_COURSEENTRY_API_URL = "http://127.0.0.1:8000/api/course-entries"
+POST_EMAIL_BATCH_API_URL = "http://127.0.0.1:8000/api/emails/batch"
+POST_COURSEENTRY_BATCH_API_URL = "http://127.0.0.1:8000/api/course-entries/batch"
 GET_COURSES_API_URL = "http://127.0.0.1:8000/api/courses"
 IMAP_SERVER = "poczta.agh.edu.pl"
 CONFIRMATION_EMAIL = "szkolenia-noreply@informatyka.agh.edu.pl"
@@ -74,84 +76,105 @@ def find_parent(mail: imaplib.IMAP4_SSL, references: list[str]) -> str | None:
 
     return None
 
+
+def fetch_email_ids(mail):
+    search_criteria = get_search_criteria()
+    print(f"Using IMAP search criteria: {search_criteria}")
+
+    status, messages = mail.search(None, search_criteria)
+    if status != "OK":
+        print(f"Error searching emails: {status}")
+        return None
+
+    return messages[0].split()
+
+
+def process_single_email(mail, e_id, email_classifier):
+    status, msg_data = mail.fetch(e_id, 'BODY.PEEK[]')
+    if status != "OK":
+        print(f"Failed to fetch email with ID {e_id.decode()}: {status}")
+        return None, None
+
+    status, processed_email, references = process_email(msg_data)
+    if status != "OK":
+        print(f"Failed to process email with ID {e_id.decode()}: {status}")
+        return None, None
+
+    if processed_email["sent_to"].lower() != IMAP_USER.lower():
+        print(f"Email with ID {e_id.decode()} was not sent to the expected address. Skipping.")
+        print(f"Sent to: {processed_email['sent_to']}, Expected: {IMAP_USER}\n")
+        return None, None
+
+    if processed_email["customer_email"].lower() == CONFIRMATION_EMAIL.lower():
+        course_details = extract_course_details(processed_email["body"])
+        email_payload = None
+        course_payload = course_details | {"sent_at": processed_email["sent_at"]} if course_details else None
+    else:
+        classifier_email_data = email_classifier.classify_category(processed_email)
+        email_payload = processed_email | classifier_email_data | {
+            "parent_message_provider_id": find_parent(mail, references)
+        }
+        course_payload = None
+
+    return email_payload, course_payload
+
+
+def send_batches(batch_email_payloads, batch_course_payloads):
+    if batch_email_payloads:
+        print(f"Sending batch of {len(batch_email_payloads)} emails...")
+        response = requests.post(POST_EMAIL_BATCH_API_URL, json={"messages": batch_email_payloads})
+        print(f"Batch Email Status: {response.status_code}")
+        print(f"Batch Email Response: {response.json()}")
+
+    if batch_course_payloads:
+        print(f"Sending batch of {len(batch_course_payloads)} course entries...")
+        response = requests.post(POST_COURSEENTRY_BATCH_API_URL, json={"entries": batch_course_payloads})
+        print(f"Batch Course Entry Status: {response.status_code}")
+        print(f"Batch Course Entry Response: {response.json()}")
+
+
+def chunk_list(data, size):
+    for i in range(0, len(data), size):
+        yield data[i:i + size]
+
+
 def process_emails():
     mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
     mail.login(IMAP_USER, IMAP_PASSWORD)
     mail.select("INBOX")
 
-    search_criteria = get_search_criteria()
-    print(f"Using IMAP search criteria: {search_criteria}")
-
-    status, messages = mail.search(None, search_criteria)
-
-    if status != "OK":
-        print(f"Error searching emails: {status}")
+    email_ids = fetch_email_ids(mail)
+    if not email_ids:
         mail.logout()
         return
 
-    email_ids = messages[0].split()[-50:]
-    print(f"Processing {len(email_ids)} new emails...")
+    print(f"Processing all {len(email_ids)} matching emails...")
 
     email_classifier = build_classifier()
     if not email_classifier:
         mail.logout()
         return
 
+    batch_email_payloads = []
+    batch_course_payloads = []
+
     for e_id in email_ids:
-        status, msg_data = mail.fetch(e_id, 'BODY.PEEK[]')
-        if status != "OK":
-            print(f"Failed to fetch email with ID {e_id.decode()}: {status}")
-            continue
+        email_payload, course_payload = process_single_email(mail, e_id, email_classifier)
 
-        status, processed_email, references = process_email(msg_data)
+        if email_payload:
+            batch_email_payloads.append(email_payload)
+        if course_payload:
+            batch_course_payloads.append(course_payload)
 
-        if status != "OK":
-            print(f"Failed to process email with ID {e_id.decode()}: {status}")
-            continue
-
-        if processed_email["sent_to"].lower() != IMAP_USER.lower():
-            print(f"Email with ID {e_id.decode()} was not sent to the expected address. Skipping.")
-            print(f"Sent to: {processed_email['sent_to']}, Expected: {IMAP_USER}")
-            print()
-            continue
-
-        if processed_email["customer_email"].lower() == CONFIRMATION_EMAIL.lower():
-           course_details = extract_course_details(processed_email["body"])
-           classifier_email_data = None
-           course_data = course_details
-        else:
-            classifier_email_data = email_classifier.classify_category(processed_email)
-            course_data = None
-
-        # for key, value in processed_email.items():
-        #     if key == "body":
-        #         continue
-        #     print(f"{key}: {value}")
-        
-        # for key, value in classifier_email_data.items():
-        #     print(f"{key}: {value}")
-
-        # if classifier_course_data is not None:
-        #     for key, value in classifier_course_data.items():
-        #         print(f"{key}: {value}")
-        if classifier_email_data is not None:
-            payload = processed_email | classifier_email_data | {"parent_message_provider_id": find_parent(mail, references)}
-            response = requests.post(POST_EMAIL_API_URL, json=payload)
-            print(f"Status: {response.status_code}")
-            print(f"Response: {response.json()}")
-
-        if course_data is not None:
-            payload = course_data | {"sent_at": processed_email["sent_at"]}
-            print(f"Posting course entry data: {payload}")
-            response = requests.post(POST_COURSEENTRY_API_URL, json=payload)
-            print(f"Status: {response.status_code}")
-            print(f"Response: {response.json()}")
-        
         print()
 
-    # update_last_pull_date()
-    mail.logout()
+    for email_chunk in chunk_list(batch_email_payloads, 50):
+        send_batches(email_chunk, [])
 
+    for course_chunk in chunk_list(batch_course_payloads, 50):
+        send_batches([], course_chunk)
+
+    mail.logout()
 
 if __name__ == "__main__":
     process_emails()

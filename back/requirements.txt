@@ -5,5 +5,5 @@ pydantic[email]
 sqlalchemy
 requests
 playwright
-openai
 python-dotenv
+ollama
