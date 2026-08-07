@@ -42,9 +42,19 @@ const normalizeCollection = (payload, key) => {
 const normalizeCourseEntry = (entry = {}, fallbackCourseName = '', courseLookup = {}, customerLookup = {}) => ({
   ...entry,
   course_entry_id: entry.course_entry_id ?? entry.entry_id ?? entry.id ?? entry.courseEntryId ?? '',
-  customer_email: entry.customer_email ?? entry.email ?? entry.customerEmail ?? entry.customer?.email ?? customerLookup[entry.customer_id]?.customer_email ?? customerLookup[entry.customer_id]?.email ?? '',
+  customer_email:
+    entry.customer_email ??
+    entry.customerEmail ??
+    entry.email ??
+    entry.customer?.email ??
+    entry.customer?.customer_email ??
+    customerLookup[entry.customer_id]?.customer_email ??
+    customerLookup[entry.customer_id]?.email ??
+    customerLookup[entry.customer?.id]?.customer_email ??
+    customerLookup[entry.customer?.id]?.email ??
+    '',
   course_name: entry.course_name ?? entry.courseName ?? entry.name ?? courseLookup[entry.course_id]?.course_name ?? courseLookup[entry.course_id]?.name ?? fallbackCourseName ?? '',
-  course_date: entry.course_date ?? entry.courseDate ?? entry.date ?? null,
+  course_date: entry.course_date ?? entry.courseDate ?? entry.date ?? entry.sent_at ?? entry.sentAt ?? null,
 });
 
 const normalizeCourseEntries = (payload, fallbackCourseName = '', courseLookup = {}, customerLookup = {}) => {
@@ -454,11 +464,12 @@ function App() {
 
       const entriesData = await entriesRes.json();
       const messagesData = await messagesRes.json();
+      const customerLookup = Object.fromEntries((customers || []).map((customer) => [customer.customer_id, customer]));
 
       setCustomerHistory({
         customer: messagesData.customer || entriesData.customer || { email },
         messages: normalizeEmailMessages(messagesData),
-        course_entries: normalizeCourseEntries(entriesData),
+        course_entries: normalizeCourseEntries(entriesData, '', {}, customerLookup),
       });
     } catch (err) {
       console.error('Error fetching customer history:', err);
@@ -490,7 +501,8 @@ function App() {
       ]);
 
       const allMessages = normalizeEmailMessages(messagesData);
-      const allEntries = normalizeCourseEntries(entriesData);
+      const customerLookup = Object.fromEntries((customers || []).map((customer) => [customer.customer_id, customer]));
+      const allEntries = normalizeCourseEntries(entriesData, '', {}, customerLookup);
 
       setAllCustomersData({
         messages: allMessages,
@@ -613,8 +625,8 @@ function App() {
                   <ul className="entries-list">
                     {courseData.entries.map((entry) => (
                       <li key={entry.course_entry_id} className="entry-item">
-                        <strong>Email:</strong> {entry.customer_email} | <strong>Course Date:</strong>{' '}
-                        {new Date(entry.course_date).toLocaleDateString()}
+                        <strong>Email:</strong> {entry.customer_email || 'Unknown'} | <strong>Course Date:</strong>{' '}
+                        {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
                       </li>
                     ))}
                   </ul>
@@ -683,7 +695,7 @@ function App() {
                     {customerHistory.course_entries.map((entry) => (
                       <li key={entry.course_entry_id} className="entry-item">
                         <strong>Course:</strong> {entry.course_name} | <strong>Date:</strong>{' '}
-                        {new Date(entry.course_date).toLocaleDateString()}
+                        {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
                       </li>
                     ))}
                   </ul>
@@ -728,8 +740,8 @@ function App() {
                   <ul className="entries-list">
                     {allCustomersData.course_entries.map((entry) => (
                       <li key={entry.course_entry_id} className="entry-item">
-                        <strong>Email:</strong> {entry.customer_email} | <strong>Course:</strong> {entry.course_name}{' '}
-                        | <strong>Date:</strong> {new Date(entry.course_date).toLocaleDateString()}
+                        <strong>Email:</strong> {entry.customer_email || 'Unknown'} | <strong>Course:</strong> {entry.course_name}{' '}
+                        | <strong>Date:</strong> {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
                       </li>
                     ))}
                   </ul>

@@ -35,6 +35,7 @@ class CourseEntryReply(BaseModel):
     entry_id: int
     course_id: int
     customer_id: int
+    customer_email: EmailStr
     course_name: str
     course_date: str
     sent_at: str

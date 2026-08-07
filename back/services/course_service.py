@@ -62,12 +62,12 @@ def get_courses(db: Session) -> list[Course]:
 def get_entries(db: Session) -> list[CourseEntryReply]:
     entries = (
         db.query(CourseEntry)
-        .options(joinedload(CourseEntry.course))
+        .options(joinedload(CourseEntry.course), joinedload(CourseEntry.customer))
         .order_by(desc(CourseEntry.course_date))
         .all()
     )
 
-    return [to_entry_reply(entry, entry.course.name) for entry in entries]
+    return [to_entry_reply(entry, entry.course.name, entry.customer.email) for entry in entries]
 
 
 def add_course_entry(db: Session, customer_email: str, course_name: str, course_date: str, sent_at: str) -> CourseEntryReply | None:
@@ -102,7 +102,7 @@ def add_course_entry(db: Session, customer_email: str, course_name: str, course_
     db.commit()
     db.refresh(course_entry)
 
-    return to_entry_reply(course_entry, course.name)
+    return to_entry_reply(course_entry, course.name, customer.email)
 
 
 def add_course_entries_batch(db: Session, entries: list[dict[str, str]]) -> list[CourseEntryReply]:
@@ -155,7 +155,7 @@ def add_course_entries_batch(db: Session, entries: list[dict[str, str]]) -> list
     for course_entry in added:
         db.refresh(course_entry)
 
-    return [to_entry_reply(entry, entry.course.name) for entry in added]
+    return [to_entry_reply(entry, entry.course.name, entry.customer.email) for entry in added]
 
 
 def get_course_entries(db: Session, course_name: str) -> list[CourseEntryReply] | None:
@@ -176,7 +176,7 @@ def get_course_entries(db: Session, course_name: str) -> list[CourseEntryReply] 
         .all()
     )
 
-    return [to_entry_reply(entry, entry.course.name) for entry in entries]
+    return [to_entry_reply(entry, entry.course.name, entry.customer.email) for entry in entries]
 
 
 def get_course_emails(db: Session, course_name: str) -> list[EmailMessageReply] | None:

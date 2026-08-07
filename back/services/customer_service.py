@@ -22,7 +22,7 @@ def get_customer_entries(db: Session, email: str) -> list[CourseEntryReply] | No
 
     course_entries = (
         db.query(CourseEntry)
-        .options(joinedload(CourseEntry.course))
+        .options(joinedload(CourseEntry.course), joinedload(CourseEntry.customer))
         .filter(
             CourseEntry.customer_id == customer.id
         )
@@ -30,7 +30,7 @@ def get_customer_entries(db: Session, email: str) -> list[CourseEntryReply] | No
         .all()
     )
 
-    return [to_entry_reply(entry, entry.course.name) for entry in course_entries]
+    return [to_entry_reply(entry, entry.course.name, entry.customer.email) for entry in course_entries]
 
 
 def get_customer_messages(db: Session, email: str) -> list[EmailMessageReply] | None:

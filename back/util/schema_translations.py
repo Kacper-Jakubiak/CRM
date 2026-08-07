@@ -17,11 +17,12 @@ def to_email_message_reply(message: EmailMessage) -> EmailMessageReply:
     )
 
 
-def to_entry_reply(entry: CourseEntry, course_name: str) -> CourseEntryReply:
+def to_entry_reply(entry: CourseEntry, course_name: str, customer_email: str) -> CourseEntryReply:
     return CourseEntryReply(
         entry_id=entry.id,
         course_id=entry.course_id,
         customer_id=entry.customer_id,
+        customer_email=customer_email,
         course_name=course_name,
         course_date=entry.course_date.isoformat(),
         sent_at=entry.sent_at.isoformat(),
