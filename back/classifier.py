@@ -6,10 +6,19 @@ class EmailClassifier:
     def __init__(self, course_names: list[str]):
         self.course_names = course_names
 
-    def classify_category(self, process_result: dict) -> dict[str, str | bool]:
+    def classify_category(self, process_result: dict[str, str]) -> dict[str, str | bool]:
+        category = "_".join(check_course_names(self.course_names, process_result)).lower() or "other"
+
+        stripped_body_text = strip_body(process_result["body"])
+
+        if '?' in stripped_body_text:
+           needs_response = True
+        else:
+           needs_response = AI_analysis(subject=process_result["subject"], body=stripped_body_text, sender=process_result["customer_email"])       
+            
         return {
-            "category": "_".join(check_course_names(self.course_names, process_result)).lower() or "other",
-            "needs_response": AI_analysis(process_result=process_result)
+            "category": category,
+            "needs_response": needs_response
         }
     
 
@@ -61,28 +70,31 @@ def strip_body(body_text: str) -> str:
     return '\n'.join(filtered_lines)
 
 
-def AI_analysis(process_result: dict) -> bool:
+def AI_analysis(subject: str, body: str, sender: str) -> bool:
     """
     Classifies whether an email needs a response using local LLM.
     """
-    subject = process_result.get("subject", "")
-    body = process_result.get("body", "")
-    sender = process_result.get("customer_email", "")
 
     prompt = f"""You are a customer support triage system. 
-Analyze if the incoming message requires a reply or assistance. 
-If the sender is asking a question or expecting an answer, output True. Otherwise output False.
+Analyze if the incoming message requires a reply from our side. 
+If the sender is asking for information, expressing interest in an offer/course, asking a question, or expecting an answer, output True. Otherwise output False.
 Output ONLY the word True or False. Do not provide any explanation.
+
+Examples:
+- "Jestem zainteresowana kursem. Czy mogę prosić o szczegóły." -> True
+- "Dziękuję za informacje. Muszę potwierdzić czy cena jest akceptowalna." -> False
+- "Kiedy rusza kolejna edycja?" -> True
+- "Proszę o dodatkowe informacje" -> True
 
 Email Sender: {sender}
 Email Subject: {subject}
 Email Body:
-{strip_body(body)}
+{body}
 
 Does this email require a response? Output ONLY True or False:"""
 
     response = ollama.chat(
-        model='gemma4:e4b', 
+        model='qwen2.5:7b',
         messages=[
             {'role': 'user', 'content': prompt}
         ],
@@ -106,8 +118,12 @@ Does this email require a response? Output ONLY True or False:"""
 
 if __name__ == "__main__":
     AI_result = AI_analysis({
-      "subject": "Pytanie o kurs",
-      "body": "Potrzebuję dostać datę kursu o nazwie 'kurs_testowy.",
+      "subject": "Re: [EXT] Szkolenia z AI",
+      "body": """Dzień dobry,
+Dziękuję za informacje. Muszę potwierdzić czy  cena jest dla nas akceptowalna. Odezwę się w nabliższym czasie. 
+Pozdrawiam,
+Paulina Stawowiak
+""",
       "customer_email": "test@email.com"
    })
 
