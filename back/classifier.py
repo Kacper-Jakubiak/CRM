@@ -50,44 +50,59 @@ def extract_course_details(text: str):
     }
     
 
+def strip_body(body_text: str) -> str:
+    """
+    Removes all lines from the text that start with '>'.
+    """
+    lines = body_text.split('\n')
+    
+    filtered_lines = [line for line in lines if not line.startswith('>')]
+    
+    return '\n'.join(filtered_lines)
+
+
 def AI_analysis(process_result: dict) -> bool:
     """
-    Classifies whether an email needs a response using local Gemma 4 (4B) via Ollama.
+    Classifies whether an email needs a response using local LLM.
     """
     subject = process_result.get("subject", "")
     body = process_result.get("body", "")
     sender = process_result.get("customer_email", "")
 
-    # More explicit instruction to avoid misinterpreting test questions
     prompt = f"""You are a customer support triage system. 
 Analyze if the incoming message requires a reply or assistance. 
 If the sender is asking a question or expecting an answer, output True. Otherwise output False.
-Output ONLY the word True or False. Always output EXACTLY one word
+Output ONLY the word True or False. Do not provide any explanation.
 
 Email Sender: {sender}
 Email Subject: {subject}
 Email Body:
-{body}
-"""
+{strip_body(body)}
+
+Does this email require a response? Output ONLY True or False:"""
 
     response = ollama.chat(
-        model='gemma4:e4b',
+        model='gemma4:e4b', 
         messages=[
             {'role': 'user', 'content': prompt}
         ],
         options={
             'temperature': 0.0,
-            'num_predict': 10
+            'num_predict': 50
         }
     )
 
     response_text = response['message']['content'].strip()
-    print(f"DEBUG - Raw Model Output: {response_text}")
+    print(f"DEBUG - Raw Model Output: '{response_text}'")
+
+    if not response_text:
+        print("DEBUG - Model returned empty string. Defaulting to True.")
+        return True 
 
     if "false" in response_text.lower():
        return False
+       
     return True
-
 
 if __name__ == "__main__":
     AI_result = AI_analysis({
