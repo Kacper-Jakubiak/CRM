@@ -11,6 +11,26 @@ router = APIRouter(
 )
 
 
+@router.get("")
+def list_emails(db: Session = Depends(get_db)):
+    email_messages = email_service.get_emails(db)
+    return {
+        "email_messages": [{
+            "id": em.id,
+            "customer_id": em.customer_id,
+            "provider_message_id": em.provider_message_id,
+            "sender": em.sender,
+            "subject": em.subject,
+            "body": em.body,
+            "sent_at": em.sent_at.isoformat(),
+            "needs_response": em.needs_response,
+            "category": em.category,
+            "thread_id": em.thread_id
+        } for em in email_messages]
+    }
+
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
     email_message = email_service.ingest_email(
@@ -42,10 +62,9 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
         }
 
 
-
 @router.post("/batch", status_code=status.HTTP_201_CREATED)
 def batch_ingest_emails(payload: EmailBatchIngestRequest, db: Session = Depends(get_db)):
-    email_messages =  email_service.ingest_email_batch(db, payload.messages)
+    email_messages =  email_service.ingest_email_batch(db, [message.model_dump() for message in payload.messages])
 
     if not email_messages:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")

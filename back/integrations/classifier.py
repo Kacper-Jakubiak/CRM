@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-import ollama
+# import ollama
 
 class EmailClassifier:
     def __init__(self, course_names: list[str]):
@@ -14,7 +14,7 @@ class EmailClassifier:
         if '?' in stripped_body_text:
            needs_response = True
         else:
-           needs_response = AI_analysis(subject=process_result["subject"], body=stripped_body_text, sender=process_result["customer_email"])       
+           needs_response = False#AI_analysis(subject=process_result["subject"], body=stripped_body_text, sender=process_result["customer_email"])       
             
         return {
             "category": category,
@@ -70,69 +70,70 @@ def strip_body(body_text: str) -> str:
     return '\n'.join(filtered_lines)
 
 
-def AI_analysis(subject: str, body: str, sender: str) -> bool:
-    """
-    Classifies whether an email needs a response using local LLM.
-    """
+# def AI_analysis(subject: str, body: str, sender: str) -> bool:
+#     """
+#     Classifies whether an email needs a response using local LLM.
+#     """
 
-    prompt = f"""You are a customer support triage system. 
-Analyze if the incoming message requires a reply from our side. 
-If the sender is asking for information, expressing interest in an offer/course, asking a question, or expecting an answer, output True. Otherwise output False.
-Output ONLY the word True or False. Do not provide any explanation.
+#     prompt = f"""You are a customer support triage system. 
+# Analyze if the incoming message requires a reply from our side. 
+# If the sender is asking for information, expressing interest in an offer/course, asking a question, or expecting an answer, output True. Otherwise output False.
+# Output ONLY the word True or False. Do not provide any explanation.
 
-Examples:
-- "Jestem zainteresowana kursem. Czy mogę prosić o szczegóły." -> True
-- "Dziękuję za informacje. Muszę potwierdzić czy cena jest akceptowalna." -> False
-- "Kiedy rusza kolejna edycja?" -> True
-- "Proszę o dodatkowe informacje" -> True
+# Examples:
+# - "Jestem zainteresowana kursem. Czy mogę prosić o szczegóły." -> True
+# - "Dziękuję za informacje. Muszę potwierdzić czy cena jest akceptowalna." -> False
+# - "Kiedy rusza kolejna edycja?" -> True
+# - "Proszę o dodatkowe informacje" -> True
 
-Email Sender: {sender}
-Email Subject: {subject}
-Email Body:
-{body}
+# Email Sender: {sender}
+# Email Subject: {subject}
+# Email Body:
+# {body}
 
-Does this email require a response? Output ONLY True or False:"""
+# Does this email require a response? Output ONLY True or False:"""
 
-    response = ollama.chat(
-        model='qwen2.5:7b',
-        messages=[
-            {'role': 'user', 'content': prompt}
-        ],
-        options={
-            'temperature': 0.0,
-            'num_predict': 50
-        }
-    )
+#     response = ollama.chat(
+#         model='qwen2.5:7b',
+#         messages=[
+#             {'role': 'user', 'content': prompt}
+#         ],
+#         options={
+#             'temperature': 0.0,
+#             'num_predict': 50
+#         }
+#     )
 
-    response_text = response['message']['content'].strip()
-    print(f"DEBUG - Raw Model Output: '{response_text}'")
+#     response_text = response['message']['content'].strip()
+#     print(f"DEBUG - Raw Model Output: '{response_text}'")
 
-    if not response_text:
-        print("DEBUG - Model returned empty string. Defaulting to True.")
-        return True 
+#     if not response_text:
+#         print("DEBUG - Model returned empty string. Defaulting to True.")
+#         return True 
 
-    if "false" in response_text.lower():
-       return False
+#     if "false" in response_text.lower():
+#        return False
        
-    return True
+#     return True
 
 if __name__ == "__main__":
-    AI_result = AI_analysis({
-      "subject": "Re: [EXT] Szkolenia z AI",
-      "body": """Dzień dobry,
-Dziękuję za informacje. Muszę potwierdzić czy  cena jest dla nas akceptowalna. Odezwę się w nabliższym czasie. 
-Pozdrawiam,
-Paulina Stawowiak
-""",
-      "customer_email": "test@email.com"
-   })
+#     AI_result = AI_analysis({
+#       "subject": "Re: [EXT] Szkolenia z AI",
+#       "body": """Dzień dobry,
+# Dziękuję za informacje. Muszę potwierdzić czy  cena jest dla nas akceptowalna. Odezwę się w nabliższym czasie. 
+# Pozdrawiam,
+# Paulina Stawowiak
+# """,
+#       "customer_email": "test@email.com"
+#    })
 
-    print(AI_result)
+#     print(AI_result)
 
-    AI_result = AI_analysis({
-      "subject": "Potwierdzenie",
-      "body": "Niestety nie dam roady dotrzeć na jutro.",
-      "customer_email": "test@email.com"
-   })
+#     AI_result = AI_analysis({
+#       "subject": "Potwierdzenie",
+#       "body": "Niestety nie dam roady dotrzeć na jutro.",
+#       "customer_email": "test@email.com"
+#    })
 
-    print(AI_result)
+#     print(AI_result)
+    pass

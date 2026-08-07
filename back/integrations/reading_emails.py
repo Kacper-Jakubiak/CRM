@@ -122,6 +122,7 @@ def save_email_batches(db, batch_email_payloads) -> list[EmailMessage]:
             all_ingested.extend(ingested)
     return all_ingested
 
+
 def save_entry_batches(db, batch_course_payloads) -> list[CourseEntry]:
     all_entries = []
     for course_chunk in chunk_list(batch_course_payloads, BATCH_SIZE_LIMIT):
@@ -158,6 +159,7 @@ def process_new_emails(db):
 
     for e_id in email_ids:
         email_payload, course_payload = process_single_email(mail, e_id, email_classifier)
+        print(f"Processed email ID {e_id.decode()}:")# Email payload: {email_payload}, Course payload: {course_payload}")
 
         if email_payload:
             email_payloads.append(email_payload)

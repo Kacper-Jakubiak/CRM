@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 
 from db import Customer, EmailMessage, Thread
 
+def get_emails(db: Session) -> list[EmailMessage]:
+    return db.query(EmailMessage).all()
 
 def ingest_email(
     db: Session,
