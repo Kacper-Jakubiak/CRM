@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-# import ollama
+import ollama
 
 class EmailClassifier:
     def __init__(self, course_names: list[str]):
@@ -9,7 +9,7 @@ class EmailClassifier:
     def classify_category(self, process_result: dict) -> dict[str, str | bool]:
         return {
             "category": "_".join(check_course_names(self.course_names, process_result)).lower() or "other",
-            "needs_response": True
+            "needs_response": AI_analysis(process_result=process_result)
         }
     
 
@@ -50,47 +50,58 @@ def extract_course_details(text: str):
     }
     
 
-# def AIanalysis(process_result: dict) -> bool:
-#     """
-#     Classifies whether an email needs a response using local Gemma 4 (4B) via Ollama.
-#     """
-#     subject = process_result.get("subject", "")
-#     body = process_result.get("body", "")
-#     sender = process_result.get("customer_email", "")
+def AI_analysis(process_result: dict) -> bool:
+    """
+    Classifies whether an email needs a response using local Gemma 4 (4B) via Ollama.
+    """
+    subject = process_result.get("subject", "")
+    body = process_result.get("body", "")
+    sender = process_result.get("customer_email", "")
 
-#     prompt = f"""You are an email classifier. Read the email below and decide if it needs a response. Answer in one word, "true" or "false".
+    # More explicit instruction to avoid misinterpreting test questions
+    prompt = f"""You are a customer support triage system. 
+Analyze if the incoming message requires a reply or assistance. 
+If the sender is asking a question or expecting an answer, output True. Otherwise output False.
+Output ONLY the word True or False. Always output EXACTLY one word
 
-# Email Sender: {sender}
-# Email Subject: {subject}
-# Email Body:
-# {body}
-# """
+Email Sender: {sender}
+Email Subject: {subject}
+Email Body:
+{body}
+"""
 
-#     # Call the local Ollama instance running Gemma 4 4B
-#     response = ollama.chat(
-#         model='gemma4:e4b',
-#         messages=[
-#             {'role': 'user', 'content': prompt}
-#         ],
-#         options={
-#             'temperature': 0.0,      # Deterministic output for classification
-#             'num_predict': 10        # Keep response short
-#         }
-#     )
+    response = ollama.chat(
+        model='gemma4:e4b',
+        messages=[
+            {'role': 'user', 'content': prompt}
+        ],
+        options={
+            'temperature': 0.0,
+            'num_predict': 10
+        }
+    )
 
-#     # Extract response text
-#     response_text = response['message']['content'].strip().lower()
+    response_text = response['message']['content'].strip()
+    print(f"DEBUG - Raw Model Output: {response_text}")
 
-#     print(response_text)
-#     if "true" in response_text:
-#         return True
-#     return False
+    if "false" in response_text.lower():
+       return False
+    return True
 
-# if __name__ == "__main__":
-#    AI_result = AIanalysis({
-#       "subject": "Question",
-#       "body": "I need an urgent answer to my question. What is 1 + 1?",
-#       "customer_email": "test@email.com"
-#    })
 
-#    print(AI_result)
+if __name__ == "__main__":
+    AI_result = AI_analysis({
+      "subject": "Pytanie o kurs",
+      "body": "Potrzebuję dostać datę kursu o nazwie 'kurs_testowy.",
+      "customer_email": "test@email.com"
+   })
+
+    print(AI_result)
+
+    AI_result = AI_analysis({
+      "subject": "Potwierdzenie",
+      "body": "Niestety nie dam roady dotrzeć na jutro.",
+      "customer_email": "test@email.com"
+   })
+
+    print(AI_result)

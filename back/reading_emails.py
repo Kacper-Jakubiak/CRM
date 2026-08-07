@@ -86,7 +86,7 @@ def fetch_email_ids(mail):
         print(f"Error searching emails: {status}")
         return None
 
-    return messages[0].split()
+    return messages[0].split()[-25:]
 
 
 def process_single_email(mail, e_id, email_classifier):
@@ -124,13 +124,13 @@ def send_batches(batch_email_payloads, batch_course_payloads):
         print(f"Sending batch of {len(batch_email_payloads)} emails...")
         response = requests.post(POST_EMAIL_BATCH_API_URL, json={"messages": batch_email_payloads})
         print(f"Batch Email Status: {response.status_code}")
-        print(f"Batch Email Response: {response.json()}")
+        # print(f"Batch Email Response: {response.json()}")
 
     if batch_course_payloads:
         print(f"Sending batch of {len(batch_course_payloads)} course entries...")
         response = requests.post(POST_COURSEENTRY_BATCH_API_URL, json={"entries": batch_course_payloads})
         print(f"Batch Course Entry Status: {response.status_code}")
-        print(f"Batch Course Entry Response: {response.json()}")
+        # print(f"Batch Course Entry Response: {response.json()}")
 
 
 def chunk_list(data, size):
@@ -165,8 +165,6 @@ def process_emails():
             batch_email_payloads.append(email_payload)
         if course_payload:
             batch_course_payloads.append(course_payload)
-
-        print()
 
     for email_chunk in chunk_list(batch_email_payloads, 50):
         send_batches(email_chunk, [])
