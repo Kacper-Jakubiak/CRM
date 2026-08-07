@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from dependencies import get_db
-from schemas import EmailIngestRequest, EmailBatchIngestRequest
+from schemas import EmailIngestRequest, EmailBatchIngestRequest, EmailMessageReply
 from services import email_service
 
 router = APIRouter(
@@ -11,23 +11,10 @@ router = APIRouter(
 )
 
 
-@router.get("")
+@router.get("", response_model=list[EmailMessageReply])
 def list_emails(db: Session = Depends(get_db)):
     email_messages = email_service.get_emails(db)
-    return {
-        "email_messages": [{
-            "id": em.id,
-            "customer_id": em.customer_id,
-            "provider_message_id": em.provider_message_id,
-            "sender": em.sender,
-            "subject": em.subject,
-            "body": em.body,
-            "sent_at": em.sent_at.isoformat(),
-            "needs_response": em.needs_response,
-            "category": em.category,
-            "thread_id": em.thread_id
-        } for em in email_messages]
-    }
+    return email_messages
 
 
 
@@ -45,47 +32,23 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
         parent_message_provider_id=payload.parent_message_provider_id
     )
 
-    if not email_message:
+    if email_message is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Message {payload.provider_message_id} already exists")
 
-    return {
-            "id": email_message.id,
-            "customer_id": email_message.customer_id,
-            "provider_message_id": email_message.provider_message_id,
-            "sender": email_message.sender,
-            "subject": email_message.subject,
-            "body": email_message.body,
-            "sent_at": email_message.sent_at.isoformat(),
-            "needs_response": email_message.needs_response,
-            "category": email_message.category,
-            "thread_id": email_message.thread_id
-        }
+    return email_message
 
 
-@router.post("/batch", status_code=status.HTTP_201_CREATED)
+@router.post("/batch", status_code=status.HTTP_201_CREATED, response_model=list[EmailMessageReply])
 def batch_ingest_emails(payload: EmailBatchIngestRequest, db: Session = Depends(get_db)):
     email_messages =  email_service.ingest_email_batch(db, [message.model_dump() for message in payload.messages])
 
-    if not email_messages:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    if email_messages is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email messages not found")
 
-    return {
-        "email_messages": [{
-            "id": em.id,
-            "customer_id": em.customer_id,
-            "provider_message_id": em.provider_message_id,
-            "sender": em.sender,
-            "subject": em.subject,
-            "body": em.body,
-            "sent_at": em.sent_at.isoformat(),
-            "needs_response": em.needs_response,
-            "category": em.category,
-            "thread_id": em.thread_id
-        } for em in email_messages]
-    }
+    return email_messages
 
 
-@router.patch("/{provider_message_id}/status")
+@router.patch("/{provider_message_id}/status", response_model=EmailMessageReply)
 def update_message_status(provider_message_id: str, needs_response: bool, db: Session = Depends(get_db)):
     email_message = email_service.update_email_status(
         db=db,
@@ -93,48 +56,26 @@ def update_message_status(provider_message_id: str, needs_response: bool, db: Se
         needs_response=needs_response
     )
 
-    if not email_message:
+    if email_message is None:
         raise HTTPException(
             status_code=404,
             detail="Message not found"
         )
 
-    return {
-            "id": email_message.id,
-            "customer_id": email_message.customer_id,
-            "provider_message_id": email_message.provider_message_id,
-            "sender": email_message.sender,
-            "subject": email_message.subject,
-            "body": email_message.body,
-            "sent_at": email_message.sent_at.isoformat(),
-            "needs_response": email_message.needs_response,
-            "category": email_message.category,
-            "thread_id": email_message.thread_id
-        }
+    return email_message
 
 
-@router.get("/{provider_message_id}")
+@router.get("/{provider_message_id}", response_model=EmailMessageReply)
 def get_message(provider_message_id: str, db: Session = Depends(get_db)):
     email_message = email_service.get_email(db, provider_message_id )
 
-    if not email_message:
+    if email_message is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
 
-    return {
-            "id": email_message.id,
-            "customer_id": email_message.customer_id,
-            "provider_message_id": email_message.provider_message_id,
-            "sender": email_message.sender,
-            "subject": email_message.subject,
-            "body": email_message.body,
-            "sent_at": email_message.sent_at.isoformat(),
-            "needs_response": email_message.needs_response,
-            "category": email_message.category,
-            "thread_id": email_message.thread_id
-        }
+    return email_message
 
 
-@router.patch("/{provider_message_id}/move")
+@router.patch("/{provider_message_id}/move", response_model=str)
 def move_message_to_thread(
     provider_message_id: str,
     new_thread_id: int,
@@ -146,17 +87,15 @@ def move_message_to_thread(
         new_thread_id=new_thread_id
     )
 
-    if not result:
+    if result is None:
         raise HTTPException(
             status_code=404,
             detail="Message or thread not found"
         )
 
-    return {
-        "detail": (
-            f"Successfully merged thread "
-            f"{result['old_thread_id']} "
-            f"({result['moved_count']} messages) "
-            f"into thread {result['new_thread_id']}."
-        )
-    }
+    return (
+        f"Successfully merged thread "
+        f"{result['old_thread_id']} "
+        f"({result['moved_count']} messages) "
+        f"into thread {result['new_thread_id']}."
+    )

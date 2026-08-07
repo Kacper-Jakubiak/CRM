@@ -2,6 +2,8 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 
 from db import Customer, CourseEntry, EmailMessage
+from schemas import CourseEntryReply, EmailMessageReply
+from util.schema_translations import to_email_message_reply, to_entry_reply
 
 
 def get_customers(db: Session) -> list[Customer]:
@@ -12,7 +14,7 @@ def get_customer_by_email(db: Session, email: str) -> Customer | None:
     return db.query(Customer).filter_by(email=email).first()
 
 
-def get_customer_entries(db: Session, email: str) -> list[CourseEntry] | None:
+def get_customer_entries(db: Session, email: str) -> list[CourseEntryReply] | None:
     customer = get_customer_by_email(db, email)
 
     if not customer:
@@ -28,10 +30,10 @@ def get_customer_entries(db: Session, email: str) -> list[CourseEntry] | None:
         .all()
     )
 
-    return course_entries
+    return [to_entry_reply(entry, entry.course.name) for entry in course_entries]
 
 
-def get_customer_messages(db: Session, email: str) -> list[EmailMessage]:
+def get_customer_messages(db: Session, email: str) -> list[EmailMessageReply] | None:
     customer = get_customer_by_email(db, email)
 
     if not customer:
@@ -46,4 +48,4 @@ def get_customer_messages(db: Session, email: str) -> list[EmailMessage]:
         .all()
     )
 
-    return messages
+    return [to_email_message_reply(message) for message in messages]

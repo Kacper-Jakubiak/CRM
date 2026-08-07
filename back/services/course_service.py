@@ -4,6 +4,8 @@ from sqlalchemy import desc
 
 from db import Course, CourseEntry, Customer, EmailMessage
 from integrations.course_parser import find_courses
+from schemas import CourseEntryReply, EmailMessageReply
+from util.schema_translations import to_entry_reply, to_email_message_reply
 
 
 def add_course(db: Session, course_name: str) -> Course | None:
@@ -57,7 +59,18 @@ def get_courses(db: Session) -> list[Course]:
     return courses
 
 
-def add_course_entry(db: Session, customer_email: str, course_name: str, course_date: str, sent_at: str) -> CourseEntry | None:
+def get_entries(db: Session) -> list[CourseEntryReply]:
+    entries = (
+        db.query(CourseEntry)
+        .options(joinedload(CourseEntry.course))
+        .order_by(desc(CourseEntry.course_date))
+        .all()
+    )
+
+    return [to_entry_reply(entry, entry.course.name) for entry in entries]
+
+
+def add_course_entry(db: Session, customer_email: str, course_name: str, course_date: str, sent_at: str) -> CourseEntryReply | None:
     course = (
         db.query(Course)
         .filter_by(name=course_name)
@@ -89,10 +102,10 @@ def add_course_entry(db: Session, customer_email: str, course_name: str, course_
     db.commit()
     db.refresh(course_entry)
 
-    return course_entry
+    return to_entry_reply(course_entry, course.name)
 
 
-def add_course_entries_batch(db: Session, entries: list[dict[str, str]]) -> list[CourseEntry]:
+def add_course_entries_batch(db: Session, entries: list[dict[str, str]]) -> list[CourseEntryReply]:
     """
     entries should be a list of dictionaries:
     {
@@ -142,10 +155,10 @@ def add_course_entries_batch(db: Session, entries: list[dict[str, str]]) -> list
     for course_entry in added:
         db.refresh(course_entry)
 
-    return added
+    return [to_entry_reply(entry, entry.course.name) for entry in added]
 
 
-def get_course_entries(db: Session, course_name: str) -> list[CourseEntry] | None:
+def get_course_entries(db: Session, course_name: str) -> list[CourseEntryReply] | None:
     course = (
         db.query(Course)
         .filter_by(name=course_name)
@@ -157,16 +170,16 @@ def get_course_entries(db: Session, course_name: str) -> list[CourseEntry] | Non
 
     entries = (
         db.query(CourseEntry)
-        .options(joinedload(CourseEntry.customer))
+        .options(joinedload(CourseEntry.course), joinedload(CourseEntry.customer))
         .filter_by(course_id=course.id)
         .order_by(desc(CourseEntry.course_date))
         .all()
     )
 
-    return entries
+    return [to_entry_reply(entry, entry.course.name) for entry in entries]
 
 
-def get_course_emails(db: Session, course_name: str) -> list[EmailMessage] | None:
+def get_course_emails(db: Session, course_name: str) -> list[EmailMessageReply] | None:
     course = (
         db.query(Course)
         .filter_by(name=course_name)
@@ -189,4 +202,4 @@ def get_course_emails(db: Session, course_name: str) -> list[EmailMessage] | Non
         .all()
     )
 
-    return emails
+    return [to_email_message_reply(email) for email in emails]

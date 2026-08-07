@@ -3,9 +3,12 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from db import Customer, EmailMessage, Thread
+from schemas import EmailMessageReply
+from util.schema_translations import to_email_message_reply
 
-def get_emails(db: Session) -> list[EmailMessage]:
-    return db.query(EmailMessage).all()
+
+def get_emails(db: Session) -> list[EmailMessageReply]:
+    return [to_email_message_reply(message) for message in db.query(EmailMessage).all()]
 
 def ingest_email(
     db: Session,
@@ -17,10 +20,8 @@ def ingest_email(
     body: str,
     sent_at: str,
     parent_message_provider_id: str | None = None
-) -> EmailMessage | None:
-    existing_message = db.query(EmailMessage).filter_by(
-        provider_message_id=provider_message_id
-    ).first()
+) -> EmailMessageReply | None:
+    existing_message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
 
     if existing_message:
         return None
@@ -28,9 +29,7 @@ def ingest_email(
     thread_id = None
 
     if parent_message_provider_id:
-        parent = db.query(EmailMessage).filter_by(
-            provider_message_id=parent_message_provider_id
-        ).first()
+        parent = db.query(EmailMessage).filter_by(provider_message_id=parent_message_provider_id).first()
 
         if parent:
             thread_id = parent.thread_id
@@ -41,9 +40,7 @@ def ingest_email(
         db.flush()
         thread_id = thread.id
 
-    customer = db.query(Customer).filter_by(
-        email=customer_email
-    ).first()
+    customer = db.query(Customer).filter_by(email=customer_email).first()
 
     if not customer:
         customer = Customer(email=customer_email)
@@ -66,10 +63,10 @@ def ingest_email(
     db.commit()
     db.refresh(message)
 
-    return message
+    return to_email_message_reply(message)
 
 
-def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailMessage]:
+def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailMessageReply]:
     """
     entries should be a list of dictionaries:
     {
@@ -142,10 +139,10 @@ def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailM
     for message in ingested_messages:
         db.refresh(message)
 
-    return ingested_messages
+    return [to_email_message_reply(message) for message in ingested_messages]
 
 
-def update_email_status(db: Session, provider_message_id: str, needs_response: bool) -> EmailMessage | None:
+def update_email_status(db: Session, provider_message_id: str, needs_response: bool) -> EmailMessageReply | None:
     message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
 
     if not message:
@@ -155,11 +152,14 @@ def update_email_status(db: Session, provider_message_id: str, needs_response: b
     db.commit()
     db.refresh(message)
 
-    return message
+    return to_email_message_reply(message)
 
 
-def get_email(db: Session, provider_message_id: str) -> EmailMessage | None:
-    return db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
+def get_email(db: Session, provider_message_id: str) -> EmailMessageReply | None:
+    message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
+    if message is None:
+        return None
+    return to_email_message_reply(message)
 
 
 def move_email_to_thread(

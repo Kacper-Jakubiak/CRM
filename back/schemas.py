@@ -23,8 +23,40 @@ class CourseEntryRequest(BaseModel):
 class CourseEntryBatchRequest(BaseModel):
     entries: List[CourseEntryRequest]
 
+class CourseReply(BaseModel):
+    course_id: int
+    course_name: str
+
+class CustomerReply(BaseModel):
+    customer_id: int
+    customer_email: EmailStr
+
+class CourseEntryReply(BaseModel):
+    entry_id: int
+    course_id: int
+    customer_id: int
+    course_name: str
+    course_date: str
+    sent_at: str
+
+class EmailMessageReply(BaseModel):
+    id: int
+    customer_id: int
+    provider_message_id: str
+    sender: str
+    subject: str
+    body: str
+    sent_at: str
+    needs_response: bool
+    category: str
+    thread_id: int
+
 class EmailSendRequest(BaseModel):
     recipient_email: EmailStr
     subject: str
     body: str
     reply_message_id: Optional[str] = None
+
+class PullEmailsReply(BaseModel):
+    email_batch: List[EmailMessageReply]
+    entry_batch: List[CourseEntryReply]

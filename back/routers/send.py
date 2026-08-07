@@ -7,7 +7,7 @@ router = APIRouter(
     tags=["send"]
 )
 
-@router.post("/api/send")
+@router.post("", response_model=str)
 def send(payload: EmailSendRequest):
     send_status = send_service.send_customer_email(
         recipient_email=payload.recipient_email,
@@ -18,4 +18,4 @@ def send(payload: EmailSendRequest):
     
     if send_status != "OK":
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=status)
-    return {"send_status": send_status}
+    return send_status
