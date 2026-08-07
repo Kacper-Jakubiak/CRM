@@ -1,13 +1,6 @@
 from playwright.sync_api import sync_playwright
 import requests
 
-ADD_COURSE_API_URL = "http://127.0.0.1:8000/api/courses"
-
-def add_courses(course_names: list[str]):
-    for course_name in course_names:
-      response = requests.post(ADD_COURSE_API_URL, params={"course_name": course_name})
-      print(f"Status: {response.status_code} | Response: {response.json()}")
-
 def find_courses() -> list[str]:
   with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
@@ -26,4 +19,7 @@ def find_courses() -> list[str]:
 
 
 if __name__ == "__main__":
-  add_courses(find_courses())
+   ADD_COURSE_API_URL = "http://127.0.0.1:8000/api/courses"
+   for course_name in find_courses():
+      response = requests.post(ADD_COURSE_API_URL, params={"course_name": course_name})
+      print(f"Status: {response.status_code} | Response: {response.json()}")

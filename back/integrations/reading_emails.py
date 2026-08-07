@@ -1,33 +1,28 @@
 from datetime import date
-from email_parser import *
-from classifier import EmailClassifier, extract_course_details
+from integrations.email_parser import *
+from integrations.classifier import EmailClassifier, extract_course_details
 from dotenv import load_dotenv
 import imaplib
 import os
-import requests
+from db import EmailMessage, CourseEntry
 
 load_dotenv()
 
-# POST_EMAIL_API_URL = "http://127.0.0.1:8000/api/emails"
-# POST_COURSEENTRY_API_URL = "http://127.0.0.1:8000/api/course-entries"
-POST_EMAIL_BATCH_API_URL = "http://127.0.0.1:8000/api/emails/batch"
-POST_COURSEENTRY_BATCH_API_URL = "http://127.0.0.1:8000/api/course-entries/batch"
-GET_COURSES_API_URL = "http://127.0.0.1:8000/api/courses"
+from services import email_service
+from services import course_service
+
 IMAP_SERVER = "poczta.agh.edu.pl"
 CONFIRMATION_EMAIL = "szkolenia-noreply@informatyka.agh.edu.pl"
 IMAP_PORT = 993
 IMAP_USER: str = os.getenv("CDSI_EMAIL_USER", "")
 IMAP_PASSWORD: str = os.getenv("CDSI_EMAIL_PASSWORD", "")
 LAST_PULL_FILE = "last_email_pull.txt"
+BATCH_SIZE_LIMIT = 50
 
 
-def build_classifier() -> EmailClassifier | None:
-    response = requests.get(GET_COURSES_API_URL)
-    if response.status_code != 200:
-        print(f"Status: {response.status_code} | Response: {response.json()}")
-        return None
-    data = response.json()
-    course_names = [course["course_name"] for course in data.get("courses", [])]
+def build_classifier(db) -> EmailClassifier | None:
+    courses = course_service.get_courses(db)
+    course_names = [course.name for course in courses]
     return EmailClassifier(course_names)
 
 
@@ -119,23 +114,21 @@ def process_single_email(mail, e_id, email_classifier):
     return email_payload, course_payload
 
 
-def send_batches(batch_email_payloads, batch_course_payloads):
-    if batch_email_payloads:
-        print(f"Sending batch of {len(batch_email_payloads)} emails...")
-        print(batch_course_payloads)
-        response = requests.post(POST_EMAIL_BATCH_API_URL, json={"messages": batch_email_payloads})
-        print(f"Batch Email Status: {response.status_code}")
-        if response.status_code == 201:
-            print(f"Processed count: {response.json()["processed_count"]}")
-        # print(f"Batch Email Response: {response.json()}")
+def save_email_batches(db, batch_email_payloads) -> list[EmailMessage]:
+    all_ingested = []
+    for email_chunk in chunk_list(batch_email_payloads, BATCH_SIZE_LIMIT):
+        ingested = email_service.ingest_email_batch(db, email_chunk)
+        if ingested:
+            all_ingested.extend(ingested)
+    return all_ingested
 
-    if batch_course_payloads:
-        print(f"Sending batch of {len(batch_course_payloads)} course entries...")
-        response = requests.post(POST_COURSEENTRY_BATCH_API_URL, json={"entries": batch_course_payloads})
-        print(f"Batch Course Entry Status: {response.status_code}")
-        if response.status_code == 201:
-            print(f"Processed count: {response.json()["processed_count"]}")
-        # print(f"Batch Course Entry Response: {response.json()}")
+def save_entry_batches(db, batch_course_payloads) -> list[CourseEntry]:
+    all_entries = []
+    for course_chunk in chunk_list(batch_course_payloads, BATCH_SIZE_LIMIT):
+        entries = course_service.add_course_entries_batch(db, course_chunk)
+        if entries:
+            all_entries.extend(entries)
+    return all_entries
 
 
 def chunk_list(data, size):
@@ -143,7 +136,7 @@ def chunk_list(data, size):
         yield data[i:i + size]
 
 
-def process_emails():
+def process_new_emails(db):
     mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
     mail.login(IMAP_USER, IMAP_PASSWORD)
     mail.select("INBOX")
@@ -151,33 +144,28 @@ def process_emails():
     email_ids = fetch_email_ids(mail)
     if not email_ids:
         mail.logout()
-        return
+        return None
 
     print(f"Processing {len(email_ids)} matching emails...")
 
-    email_classifier = build_classifier()
+    email_classifier = build_classifier(db)
     if not email_classifier:
         mail.logout()
-        return
+        return None
 
-    batch_email_payloads = []
-    batch_course_payloads = []
+    email_payloads = []
+    course_payloads = []
 
     for e_id in email_ids:
         email_payload, course_payload = process_single_email(mail, e_id, email_classifier)
 
         if email_payload:
-            batch_email_payloads.append(email_payload)
+            email_payloads.append(email_payload)
         if course_payload:
-            batch_course_payloads.append(course_payload)
+            course_payloads.append(course_payload)
 
-    for email_chunk in chunk_list(batch_email_payloads, 50):
-        send_batches(email_chunk, [])
-
-    for course_chunk in chunk_list(batch_course_payloads, 50):
-        send_batches([], course_chunk)
+    email_batch_results = save_email_batches(db, email_payloads)
+    entry_batch_results = save_entry_batches(db, course_payloads)
 
     mail.logout()
-
-if __name__ == "__main__":
-    process_emails()
+    return email_batch_results, entry_batch_results

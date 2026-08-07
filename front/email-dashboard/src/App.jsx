@@ -22,7 +22,7 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
 
     try {
       const statusRes = await fetch(
-        `${API_BASE_URL}/api/messages/${msg.provider_message_id}/status?needs_response=${newStatus}`,
+        `${API_BASE_URL}/api/emails/${msg.provider_message_id}/status?needs_response=${newStatus}`,
         { method: 'PATCH' }
       );
 
@@ -30,7 +30,7 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
         throw new Error('Failed to update message status');
       }
 
-      const freshMsgRes = await fetch(`${API_BASE_URL}/api/messages/${msg.provider_message_id}`);
+      const freshMsgRes = await fetch(`${API_BASE_URL}/api/emails/${msg.provider_message_id}`);
       if (freshMsgRes.ok) {
         const freshData = await freshMsgRes.json();
         const updatedMessage = freshData.message;
@@ -72,7 +72,7 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
       }
 
       const statusRes = await fetch(
-        `${API_BASE_URL}/api/messages/${msg.provider_message_id}/status?needs_response=false`,
+        `${API_BASE_URL}/api/emails/${msg.provider_message_id}/status?needs_response=false`,
         { method: 'PATCH' }
       );
 
@@ -80,7 +80,7 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
         throw new Error('Failed to update message status');
       }
 
-      const freshMsgRes = await fetch(`${API_BASE_URL}/api/messages/${msg.provider_message_id}`);
+      const freshMsgRes = await fetch(`${API_BASE_URL}/api/emails/${msg.provider_message_id}`);
       if (freshMsgRes.ok) {
         const freshData = await freshMsgRes.json();
         const updatedMessage = freshData.message;
@@ -206,7 +206,7 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
     try {
       const providerMsgId = representativeMsg.provider_message_id;
       const res = await fetch(
-        `${API_BASE_URL}/api/messages/${providerMsgId}/move?new_thread_id=${encodeURIComponent(
+        `${API_BASE_URL}/api/emails/${providerMsgId}/move?new_thread_id=${encodeURIComponent(
           targetThreadId
         )}`,
         { method: 'PATCH' }
@@ -368,7 +368,7 @@ function App() {
     try {
       const [entriesRes, messagesRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseName)}/entries`),
-        fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseName)}/messages`),
+        fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseName)}/emails`),
       ]);
 
       const entriesData = await entriesRes.json();
@@ -395,7 +395,7 @@ function App() {
     try {
       const [entriesRes, messagesRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(email)}/entries`),
-        fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(email)}/messages`),
+        fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(email)}/emails`),
       ]);
 
       const entriesData = await entriesRes.json();
@@ -425,7 +425,7 @@ function App() {
         try {
           const [entriesRes, messagesRes] = await Promise.all([
             fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(c.customer_email)}/entries`),
-            fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(c.customer_email)}/messages`),
+            fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(c.customer_email)}/emails`),
           ]);
           const entriesData = await entriesRes.json();
           const messagesData = await messagesRes.json();
