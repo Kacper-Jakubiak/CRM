@@ -12,7 +12,6 @@ def get_emails(db: Session) -> list[EmailMessageReply]:
 
 
 def get_thread_messages(db: Session, thread_id: int) -> list[EmailMessageReply] | None:
-    print(thread_id)
     thread = db.query(Thread).filter_by(id=thread_id).first()
     if not thread:
         return None

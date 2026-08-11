@@ -70,7 +70,6 @@ def merge_threads(old_thread_id: int, new_thread_id: int, db: Session = Depends(
 
 @router.get("/threads/{thread_id}", response_model=list[EmailMessageReply])
 def get_thread_messages(thread_id: int, db: Session = Depends(get_db)):
-    print(f"Fetching thread ID: {thread_id}")
     email_messages = email_service.get_thread_messages(db, thread_id)
 
     if email_messages is None:

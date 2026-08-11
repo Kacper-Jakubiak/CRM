@@ -11,245 +11,30 @@ const sortEntriesNewestFirst = (entries) => {
   });
 };
 
-function DisplayEmail({ msg, customerEmail, onMessageUpdate, onThreadMoved }) {
-  const [replyBody, setReplyBody] = useState('');
-  const [isReplying, setIsReplying] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [togglingStatus, setTogglingStatus] = useState(false);
-  const [needsResponse, setNeedsResponse] = useState(msg.needs_response);
-
-  const [targetThreadId, setTargetThreadId] = useState('');
-  const [movingMsg, setMovingMsg] = useState(false);
-
-  useEffect(() => {
-    setNeedsResponse(msg.needs_response);
-  }, [msg.needs_response]);
-
+function DisplayEmail({ msg, customerEmail, onSelectMessage }) {
   const emailAddress = customerEmail || msg.sender || 'Unknown';
 
-  const handleToggleNeedsResponse = async () => {
-    const newStatus = !needsResponse;
-    setTogglingStatus(true);
-
-    try {
-      const statusRes = await fetch(
-        `${API_BASE_URL}/api/emails/${msg.provider_message_id}/status?needs_response=${newStatus}`,
-        { method: 'PATCH' }
-      );
-
-      if (!statusRes.ok) {
-        throw new Error('Failed to update message status');
-      }
-
-      const freshMsgRes = await fetch(`${API_BASE_URL}/api/emails/${msg.provider_message_id}`);
-      if (freshMsgRes.ok) {
-        const updatedMessage = await freshMsgRes.json();
-
-        setNeedsResponse(updatedMessage.needs_response);
-
-        if (onMessageUpdate) {
-          onMessageUpdate({ ...msg, ...updatedMessage });
-        }
-      }
-    } catch (err) {
-      console.error('Error toggling status:', err);
-      alert('Failed to update status.');
-    } finally {
-      setTogglingStatus(false);
-    }
-  };
-
-  const handleSendReply = async () => {
-    if (!replyBody.trim()) return;
-    setSending(true);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          recipient_email: emailAddress,
-          subject: `Re: ${msg.subject || 'No Subject'}`,
-          body: replyBody,
-          reply_message_id: msg.provider_message_id,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send email');
-      }
-
-      const statusRes = await fetch(
-        `${API_BASE_URL}/api/emails/${msg.provider_message_id}/status?needs_response=false`,
-        { method: 'PATCH' }
-      );
-
-      if (!statusRes.ok) {
-        throw new Error('Failed to update message status');
-      }
-
-      const freshMsgRes = await fetch(`${API_BASE_URL}/api/emails/${msg.provider_message_id}`);
-      if (freshMsgRes.ok) {
-        const updatedMessage = await freshMsgRes.json();
-
-        setNeedsResponse(updatedMessage.needs_response);
-
-        if (onMessageUpdate) {
-          onMessageUpdate({ ...msg, ...updatedMessage });
-        }
-      }
-
-      alert('Reply sent successfully!');
-      setReplyBody('');
-      setIsReplying(false);
-    } catch (err) {
-      console.error('Error sending reply:', err);
-      alert('Failed to send reply.');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const handleMoveMessage = async () => {
-    if (!targetThreadId.trim()) {
-      alert('Please enter a target Thread ID.');
-      return;
-    }
-
-    setMovingMsg(true);
-    try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/emails/${msg.provider_message_id}/move?new_thread_id=${encodeURIComponent(
-          targetThreadId
-        )}`,
-        { method: 'PATCH' }
-      );
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to move message');
-      }
-
-      alert('Message moved successfully!');
-      setTargetThreadId('');
-
-      if (onThreadMoved) {
-        onThreadMoved();
-      }
-    } catch (err) {
-      console.error('Error moving message:', err);
-      alert(`Error: ${err.message}`);
-    } finally {
-      setMovingMsg(false);
-    }
-  };
-
   return (
-    <li className="email-item">
+    <li className="email-item" onClick={() => onSelectMessage && onSelectMessage(msg)}>
       <div className="email-header">
-        <strong className="email-subject">
-          {msg.subject || '(No Subject)'}
-        </strong>
-        <span className="email-timestamp">
-          {msg.sent_at ? new Date(msg.sent_at).toLocaleString() : ''}
-        </span>
+        <strong className="email-subject">{msg.subject || '(No Subject)'}</strong>
+        <span className="email-timestamp">{msg.sent_at ? new Date(msg.sent_at).toLocaleString() : ''}</span>
       </div>
 
       <div className="email-meta">
-        <span className="email-sender">
-          <strong>From:</strong> {emailAddress}
+        <span className="email-sender"><strong>From:</strong> {emailAddress}</span>
+        <span className={msg.needs_response ? 'status-needs-response' : 'status-resolved'}>
+          {msg.needs_response ? 'Needs Response' : 'Resolved'}
         </span>
-        <div className="email-status-group">
-          <span>
-            Status:{' '}
-            <span className={needsResponse ? 'status-needs-response' : 'status-resolved'}>
-              {needsResponse ? 'Needs Response' : 'Resolved'}
-            </span>
-          </span>
-          <button
-            onClick={handleToggleNeedsResponse}
-            disabled={togglingStatus}
-            className="btn-toggle-status"
-          >
-            {togglingStatus ? '...' : needsResponse ? 'Resolve' : 'Reopen'}
-          </button>
-        </div>
       </div>
-
-      <div className="email-body-group">
-        <details className="email-details">
-          <summary className="email-summary">
-            View Body
-          </summary>
-          <div
-            className="email-content"
-            dangerouslySetInnerHTML={{ __html: msg.body }}
-          />
-        </details>
-        
-        <div className="email-actions-group">
-          {!isReplying && (
-            <button onClick={() => setIsReplying(true)} className="btn-reply">
-              Reply
-            </button>
-          )}
-
-          <div className="move-message-group">
-            <input
-              type="number"
-              placeholder="New Thread ID"
-              value={targetThreadId}
-              onChange={(e) => setTargetThreadId(e.target.value)}
-              className="input-target-id input-move-msg"
-            />
-            <button
-              onClick={handleMoveMessage}
-              disabled={movingMsg}
-              className="btn-merge"
-            >
-              {movingMsg ? 'Moving...' : 'Move Msg'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {isReplying && (
-        <div className="reply-form">
-          <textarea
-            rows="2"
-            value={replyBody}
-            onChange={(e) => setReplyBody(e.target.value)}
-            placeholder="Type your reply here..."
-            className="reply-textarea"
-          />
-          <div className="reply-actions">
-            <button
-              onClick={handleSendReply}
-              disabled={sending}
-              className="btn-send"
-            >
-              {sending ? 'Sending...' : 'Send'}
-            </button>
-            <button
-              onClick={() => setIsReplying(false)}
-              className="btn-cancel"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
     </li>
   );
 }
 
-function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
+function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSelectMessage, selectedEmail }) {
   const [targetThreadId, setTargetThreadId] = useState('');
   const [merging, setMerging] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
-
   const [threadMessages, setThreadMessages] = useState(messages);
   const [loadingThread, setLoadingThread] = useState(false);
   const [hasFetchedFullThread, setHasFetchedFullThread] = useState(false);
@@ -287,7 +72,6 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
     const willExpand = collapsed;
     setCollapsed(!collapsed);
 
-    // Auto-fetch complete thread via /api/messages/threads/{thread_id} when expanding for the first time
     if (willExpand && threadId !== 'Unassigned' && !hasFetchedFullThread) {
       fetchFullThreadMessages();
     }
@@ -307,9 +91,7 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
     setMerging(true);
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/emails/threads/merge?old_thread_id=${threadId}&new_thread_id=${encodeURIComponent(
-          targetThreadId
-        )}`,
+        `${API_BASE_URL}/api/emails/threads/merge?old_thread_id=${threadId}&new_thread_id=${encodeURIComponent(targetThreadId)}`,
         { method: 'PATCH' }
       );
 
@@ -320,7 +102,6 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
 
       alert('Thread merged successfully!');
       setTargetThreadId('');
-
       if (onThreadMoved) {
         onThreadMoved();
       }
@@ -349,23 +130,16 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
     <div className="thread-card">
       <div className={`thread-header ${collapsed ? 'collapsed' : 'expanded'}`}>
         <div className="thread-title-group">
-          <button onClick={handleToggleCollapse} className="btn-collapse">
+          <button onClick={handleToggleCollapse} className="btn-collapse" type="button">
             {collapsed ? '▶ Expand' : '▼ Collapse'}
           </button>
           <h4 className="thread-title">
-            Thread #{threadId !== 'Unassigned' ? threadId : 'Unassigned'}{' '}
-            <span className="thread-count">
-              ({threadMessages.length} {threadMessages.length === 1 ? 'msg' : 'msgs'})
-            </span>
+            Thread #{threadId !== 'Unassigned' ? threadId : 'Unassigned'}
+            <span className="thread-count"> ({threadMessages.length} {threadMessages.length === 1 ? 'msg' : 'msgs'})</span>
           </h4>
 
           {threadId !== 'Unassigned' && (
-            <button
-              onClick={fetchFullThreadMessages}
-              disabled={loadingThread}
-              className="btn-fetch-thread"
-              title="Fetch all messages in this thread from /api/messages/threads/{thread_id}"
-            >
+            <button onClick={fetchFullThreadMessages} disabled={loadingThread} className="btn-fetch-thread" title="Fetch all messages in this thread" type="button">
               {loadingThread ? 'Loading...' : hasFetchedFullThread ? '✓ Synced' : '↻ Fetch Full Thread'}
             </button>
           )}
@@ -381,11 +155,7 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
                 onChange={(e) => setTargetThreadId(e.target.value)}
                 className="input-target-id"
               />
-              <button
-                onClick={handleMergeThreads}
-                disabled={merging}
-                className="btn-merge"
-              >
+              <button onClick={handleMergeThreads} disabled={merging} className="btn-merge" type="button">
                 {merging ? 'Merging...' : 'Merge Thread'}
               </button>
             </>
@@ -403,19 +173,18 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
             customerEmail={msg.customer_email}
             onMessageUpdate={handleLocalMessageUpdate}
             onThreadMoved={onThreadMoved}
+            onSelectMessage={onSelectMessage}
           />
         ))}
       </ul>
       {collapsed && threadMessages.length > 1 && (
-        <p className="hidden-msg-text">
-          + {threadMessages.length - 1} older message(s) hidden.
-        </p>
+        <p className="hidden-msg-text">+ {threadMessages.length - 1} older message(s) hidden.</p>
       )}
     </div>
   );
 }
 
-function MessageThreadList({ messages, messageFilter, onMessageUpdate, onThreadMoved }) {
+function MessageThreadList({ messages, messageFilter, onMessageUpdate, onThreadMoved, onSelectMessage, selectedEmail }) {
   const filteredMessages = messages.filter((msg) => {
     if (messageFilter === 'true') return msg.needs_response === true;
     if (messageFilter === 'false') return msg.needs_response === false;
@@ -457,6 +226,8 @@ function MessageThreadList({ messages, messageFilter, onMessageUpdate, onThreadM
           messages={threadMsgs}
           onMessageUpdate={onMessageUpdate}
           onThreadMoved={onThreadMoved}
+          onSelectMessage={onSelectMessage}
+          selectedEmail={selectedEmail}
         />
       ))}
     </div>
@@ -464,19 +235,32 @@ function MessageThreadList({ messages, messageFilter, onMessageUpdate, onThreadM
 }
 
 function App() {
+  const [view, setView] = useState('courses');
+  const [theme, setTheme] = useState('dark');
   const [courses, setCourses] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [showAllCustomers, setShowAllCustomers] = useState(false);
-  const [allCustomersData, setAllCustomersData] = useState({ messages: [], course_entries: [] });
-
   const [courseData, setCourseData] = useState({ entries: [], messages: [] });
   const [customerHistory, setCustomerHistory] = useState({ customer: null, messages: [], course_entries: [] });
   const [loading, setLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-
   const [messageFilter, setMessageFilter] = useState('all');
+  const [middleView, setMiddleView] = useState('entries');
+  const [selectedEmail, setSelectedEmail] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [moveThreadTarget, setMoveThreadTarget] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
+  const [sendingReply, setSendingReply] = useState(false);
+  const [movingEmail, setMovingEmail] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState(false);
+
+  useEffect(() => {
+    setMiddleView('entries');
+    setReplyText('');
+    setMoveThreadTarget('');
+    setIsReplying(false);
+  }, [selectedCourse, selectedCustomer]);
 
   const fetchCoursesAndCustomers = () => {
     fetch(`${API_BASE_URL}/api/courses`)
@@ -497,7 +281,7 @@ function App() {
   const handleCourseClick = async (courseName) => {
     setSelectedCourse(courseName);
     setSelectedCustomer(null);
-    setShowAllCustomers(false);
+    setSelectedEmail(null);
     setMessageFilter('all');
     setLoading(true);
 
@@ -521,10 +305,38 @@ function App() {
     }
   };
 
+  const handleAllCourseEntries = async () => {
+    setSelectedCourse('All');
+    setSelectedCustomer(null);
+    setSelectedEmail(null);
+    setMessageFilter('all');
+    setMiddleView('entries');
+    setLoading(true);
+
+    try {
+      const [entriesRes, emailsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/courses/entries`),
+        fetch(`${API_BASE_URL}/api/emails`),
+      ]);
+
+      const entriesData = entriesRes.ok ? await entriesRes.json() : [];
+      const messagesData = emailsRes.ok ? await emailsRes.json() : [];
+
+      setCourseData({
+        entries: entriesData,
+        messages: messagesData,
+      });
+    } catch (err) {
+      console.error('Error fetching all course entries:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCustomerClick = async (email) => {
     setSelectedCustomer(email);
     setSelectedCourse(null);
-    setShowAllCustomers(false);
+    setSelectedEmail(null);
     setMessageFilter('all');
     setLoading(true);
 
@@ -549,59 +361,53 @@ function App() {
     }
   };
 
-  const handleAllCustomersClick = async () => {
-    setShowAllCustomers(true);
-    setSelectedCustomer(null);
+  const handleAllCustomerEmails = async () => {
+    setSelectedCustomer('All');
     setSelectedCourse(null);
+    setSelectedEmail(null);
     setMessageFilter('all');
+    setMiddleView('emails');
     setLoading(true);
 
     try {
-      const [emailsRes, entriesRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/emails`),
+      const [entriesRes, emailsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/courses/entries`),
+        fetch(`${API_BASE_URL}/api/emails`),
       ]);
 
-      if (!emailsRes.ok || !entriesRes.ok) {
-        throw new Error('Failed to fetch all customers data');
-      }
+      const entriesData = entriesRes.ok ? await entriesRes.json() : [];
+      const messagesData = emailsRes.ok ? await emailsRes.json() : [];
 
-      const [messagesData, entriesData] = await Promise.all([
-        emailsRes.json(),
-        entriesRes.json(),
-      ]);
-
-      setAllCustomersData({
+      setCustomerHistory({
+        customer: { email: 'All' },
         messages: messagesData,
         course_entries: entriesData,
       });
     } catch (err) {
-      console.error('Error fetching all customers history:', err);
-      setAllCustomersData({ messages: [], course_entries: [] });
+      console.error('Error fetching all customer emails:', err);
     } finally {
       setLoading(false);
     }
   };
 
   const refreshActiveView = () => {
-    if (selectedCourse) {
+    if (selectedCourse === 'All') {
+      handleAllCourseEntries();
+    } else if (selectedCourse) {
       handleCourseClick(selectedCourse);
+    } else if (selectedCustomer === 'All') {
+      handleAllCustomerEmails();
     } else if (selectedCustomer) {
       handleCustomerClick(selectedCustomer);
-    } else if (showAllCustomers) {
-      handleAllCustomersClick();
     }
   };
 
   const handleSyncData = async () => {
     setIsSyncing(true);
     try {
-      // Step 1: Import courses FIRST
       const coursesRes = await fetch(`${API_BASE_URL}/api/courses/import`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
 
       if (!coursesRes.ok) {
@@ -609,12 +415,9 @@ function App() {
         throw new Error(errorData.detail || 'Failed to import courses');
       }
 
-      // Step 2: Pull emails ONLY AFTER course import completes
       const emailsRes = await fetch(`${API_BASE_URL}/api/integrations/emails/pull`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
 
       if (!emailsRes.ok) {
@@ -622,7 +425,6 @@ function App() {
         throw new Error(errorData.detail || 'Failed to pull emails');
       }
 
-      // Step 3: Re-fetch sidebar list and active panel content
       fetchCoursesAndCustomers();
       refreshActiveView();
     } catch (err) {
@@ -648,223 +450,401 @@ function App() {
       ),
     }));
 
-    setAllCustomersData((prev) => ({
-      ...prev,
-      messages: prev.messages.map((m) =>
-        m.provider_message_id === updatedMsg.provider_message_id ? { ...m, ...updatedMsg } : m
-      ),
-    }));
+    setSelectedEmail((prev) => (prev && prev.provider_message_id === updatedMsg.provider_message_id ? { ...prev, ...updatedMsg } : prev));
   };
 
+  const handleToggleNeedsResponse = async () => {
+    if (!selectedEmail) return;
+
+    const newStatus = !selectedEmail.needs_response;
+    setTogglingStatus(true);
+
+    try {
+      const statusRes = await fetch(
+        `${API_BASE_URL}/api/emails/${selectedEmail.provider_message_id}/status?needs_response=${newStatus}`,
+        { method: 'PATCH' }
+      );
+
+      if (!statusRes.ok) {
+        throw new Error('Failed to update message status');
+      }
+
+      const updatedMessage = {
+        ...selectedEmail,
+        needs_response: newStatus,
+      };
+
+      handleMessageUpdate(updatedMessage);
+    } catch (err) {
+      console.error('Error toggling status:', err);
+      alert('Failed to update status.');
+    } finally {
+      setTogglingStatus(false);
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!selectedEmail || !replyText.trim()) return;
+    setSendingReply(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient_email: selectedEmail.customer_email || selectedEmail.sender || selectedCustomer,
+          subject: `Re: ${selectedEmail.subject || 'No Subject'}`,
+          body: replyText,
+          reply_message_id: selectedEmail.provider_message_id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send email');
+      }
+
+      const statusRes = await fetch(
+        `${API_BASE_URL}/api/emails/${selectedEmail.provider_message_id}/status?needs_response=false`,
+        { method: 'PATCH' }
+      );
+
+      if (!statusRes.ok) {
+        throw new Error('Failed to update message status');
+      }
+
+      handleMessageUpdate({ ...selectedEmail, needs_response: false });
+      setReplyText('');
+      setIsReplying(false);
+      alert('Reply sent successfully!');
+    } catch (err) {
+      console.error('Error sending reply:', err);
+      alert('Failed to send reply.');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const handleMoveMessage = async () => {
+    if (!selectedEmail) return;
+    if (!moveThreadTarget.trim()) {
+      alert('Please enter a target Thread ID.');
+      return;
+    }
+
+    setMovingEmail(true);
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/emails/${selectedEmail.provider_message_id}/move?new_thread_id=${encodeURIComponent(moveThreadTarget)}`,
+        { method: 'PATCH' }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to move message');
+      }
+
+      setMoveThreadTarget('');
+      refreshActiveView();
+      alert('Message moved successfully!');
+    } catch (err) {
+      console.error('Error moving message:', err);
+      alert(`Error: ${err.message}`);
+    } finally {
+      setMovingEmail(false);
+    }
+  };
+
+  const listItems = view === 'courses' ? courses : customers;
+
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1 className="app-title">Email CRM Dashboard</h1>
-        <button
-          onClick={handleSyncData}
-          disabled={isSyncing}
-          className="btn-refresh"
-        >
-          {isSyncing ? '↻ Syncing Data...' : '↻ Sync Data'}
-        </button>
+    <div className={`app-shell theme-${theme}`}>
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">CRM workspace</p>
+          <h1>Email Insights</h1>
+        </div>
+
+        <div className="topbar-actions">
+          <button className="theme-toggle" onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} type="button">
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          </button>
+          <button className="sync-button" onClick={handleSyncData} disabled={isSyncing} type="button">
+            {isSyncing ? 'Syncing…' : 'Sync data'}
+          </button>
+        </div>
       </header>
 
-      <div className="dashboard-grid">
-        <div className="lists-column">
-          {/* Courses Section */}
-          <section className="courses-section">
-            <h2 className="section-title">Courses</h2>
-            <div className="list-container courses-list-container">
-              <ul className="list">
-                {courses.map((course) => (
-                  <li key={course.course_id} className="list-item">
-                    <button
-                      onClick={() => handleCourseClick(course.course_name)}
-                      className={`btn-list-item ${selectedCourse === course.course_name ? 'active-course' : ''}`}
-                    >
-                      {course.course_name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
+      <div className="dashboard-shell">
+        <aside className="sidebar panel">
+          <div className="segment-toggle" aria-label="Toggle data source">
+            <button className={view === 'courses' ? 'segment active' : 'segment'} onClick={() => setView('courses')} type="button">Courses</button>
+            <button className={view === 'customers' ? 'segment active' : 'segment'} onClick={() => setView('customers')} type="button">Customers</button>
+          </div>
 
-          {/* Customers Section */}
-          <section>
-            <div className="all-customers-header">
-              <h2 className="section-title no-margin">Customers</h2>
-              <button
-                onClick={handleAllCustomersClick}
-                className={`btn-all-customers ${showAllCustomers ? 'active' : ''}`}
-              >
-                All
-              </button>
-            </div>
-            <div className="list-container customers-list-container">
-              <ul className="list">
-                {customers.map((customer) => (
-                  <li key={customer.customer_id} className="list-item">
-                    <button
-                      onClick={() => handleCustomerClick(customer.customer_email)}
-                      className={`btn-list-item ${selectedCustomer === customer.customer_email ? 'active-customer' : ''}`}
-                    >
-                      {customer.customer_email}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
-        </div>
+          <div className="panel-header">
+            <h2>{view === 'courses' ? 'Courses' : 'Customers'}</h2>
+          </div>
 
-        <div className="details-column">
+          <div className="list-panel">
+            <button
+              type="button"
+              className={
+                (view === 'courses' && selectedCourse === 'All') || (view === 'customers' && selectedCustomer === 'All')
+                  ? 'list-item all-button active'
+                  : 'list-item all-button'
+              }
+              onClick={() => {
+                if (view === 'courses') {
+                  handleAllCourseEntries();
+                } else {
+                  handleAllCustomerEmails();
+                }
+              }}
+            >
+              All
+            </button>
+
+            {listItems.length === 0 ? (
+              <div className="empty-state small">No records available.</div>
+            ) : (
+              listItems.map((item) => {
+                const label = view === 'courses' ? item.course_name : item.customer_email;
+                const isSelected = view === 'courses' ? selectedCourse === item.course_name : selectedCustomer === item.customer_email;
+
+                return (
+                  <button
+                    key={view === 'courses' ? item.course_id : item.customer_id}
+                    className={isSelected ? 'list-item active' : 'list-item'}
+                    onClick={() => {
+                      if (view === 'courses') {
+                        handleCourseClick(item.course_name);
+                      } else {
+                        handleCustomerClick(item.customer_email);
+                      }
+                    }}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </aside>
+
+        <main className="content-panel panel">
           {loading && <p className="status-text-info">Loading details...</p>}
 
-          {!loading && !selectedCourse && !selectedCustomer && !showAllCustomers && (
-            <p className="status-text-info">
-              Select a course, a customer, or "All" customers from the left to view details.
-            </p>
-          )}
-
-          {/* Course Details View */}
           {!loading && selectedCourse && (
-            <div>
-              <h2 className="details-title">Course Details: {selectedCourse}</h2>
-
-              <h3 className="details-subtitle no-margin-top">Entries</h3>
-              <div className="entries-container">
-                {courseData.entries.length === 0 ? (
-                  <p className="empty-text">No entries found for this course.</p>
-                ) : (
-                  <ul className="entries-list">
-                    {sortEntriesNewestFirst(courseData.entries).map((entry) => (
-                      <li key={entry.course_entry_id} className="entry-item">
-                        <strong>Email:</strong> {entry.customer_email || 'Unknown'} | <strong>Course Date:</strong>{' '}
-                        {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+            <div className="content-inner">
+              <div className="panel-header">
+                <h2>Course details: {selectedCourse}</h2>
               </div>
 
-              <div className="filter-header mt-10">
-                <div>
-                  <label className="filter-label">Filter:</label>
-                  <select
-                    value={messageFilter}
-                    onChange={(e) => setMessageFilter(e.target.value)}
-                    className="filter-select"
-                  >
-                    <option value="all">All</option>
-                    <option value="true">Needs Response: True</option>
-                    <option value="false">Needs Response: False</option>
-                  </select>
+              <div className="detail-toggle-row">
+                <button
+                  type="button"
+                  className={middleView === 'entries' ? 'detail-toggle active' : 'detail-toggle'}
+                  onClick={() => setMiddleView('entries')}
+                >
+                  Entries
+                </button>
+                <button
+                  type="button"
+                  className={middleView === 'emails' ? 'detail-toggle active' : 'detail-toggle'}
+                  onClick={() => setMiddleView('emails')}
+                >
+                  Emails
+                </button>
+              </div>
+
+              {middleView === 'entries' ? (
+                <div className="entries-block">
+                  <div className="entries-header">
+                    <h3>Entries</h3>
+                  </div>
+                  {courseData.entries.length === 0 ? (
+                    <p className="empty-text">No entries found for this course.</p>
+                  ) : (
+                    <ul className="entries-list">
+                      {sortEntriesNewestFirst(courseData.entries).map((entry) => (
+                        <li key={entry.course_entry_id} className="entry-item">
+                          <strong>Email:</strong> {entry.customer_email || 'Unknown'} | <strong>Course Date:</strong>{' '}
+                          {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <h3 className="details-subtitle no-margin">Related Messages (By Thread)</h3>
-              </div>
+              ) : (
+                <>
+                  <div className="filter-header">
+                    <div>
+                      <label className="filter-label">Filter:</label>
+                      <select value={messageFilter} onChange={(e) => setMessageFilter(e.target.value)} className="filter-select">
+                        <option value="all">All</option>
+                        <option value="true">Needs Response: True</option>
+                        <option value="false">Needs Response: False</option>
+                      </select>
+                    </div>
+                    <h3 className="details-subtitle no-margin">Related Messages</h3>
+                  </div>
 
-              <MessageThreadList
-                messages={courseData.messages}
-                messageFilter={messageFilter}
-                onMessageUpdate={handleMessageUpdate}
-                onThreadMoved={refreshActiveView}
-              />
+                  <MessageThreadList
+                    messages={courseData.messages}
+                    messageFilter={messageFilter}
+                    onMessageUpdate={handleMessageUpdate}
+                    onThreadMoved={refreshActiveView}
+                    onSelectMessage={setSelectedEmail}
+                    selectedEmail={selectedEmail}
+                  />
+                </>
+              )}
             </div>
           )}
 
-          {/* Customer Details View */}
           {!loading && selectedCustomer && (
-            <div>
-              <h2 className="details-title">Customer History: {selectedCustomer}</h2>
+            <div className="content-inner">
+              <div className="panel-header">
+                <h2>Customer history: {selectedCustomer}</h2>
+              </div>
 
-              <div className="filter-header-no-margin">
-                <div>
-                  <label className="filter-label">Filter:</label>
-                  <select
-                    value={messageFilter}
-                    onChange={(e) => setMessageFilter(e.target.value)}
-                    className="filter-select"
-                  >
-                    <option value="all">All</option>
-                    <option value="true">Needs Response: True</option>
-                    <option value="false">Needs Response: False</option>
-                  </select>
+              <div className="detail-toggle-row">
+                <button
+                  type="button"
+                  className={middleView === 'entries' ? 'detail-toggle active' : 'detail-toggle'}
+                  onClick={() => setMiddleView('entries')}
+                >
+                  Entries
+                </button>
+                <button
+                  type="button"
+                  className={middleView === 'emails' ? 'detail-toggle active' : 'detail-toggle'}
+                  onClick={() => setMiddleView('emails')}
+                >
+                  Emails
+                </button>
+              </div>
+
+              {middleView === 'emails' ? (
+                <>
+                  <div className="filter-header compact-header">
+                    <div>
+                      <label className="filter-label">Filter:</label>
+                      <select value={messageFilter} onChange={(e) => setMessageFilter(e.target.value)} className="filter-select">
+                        <option value="all">All</option>
+                        <option value="true">Needs Response: True</option>
+                        <option value="false">Needs Response: False</option>
+                      </select>
+                    </div>
+                    <h3 className="details-subtitle no-margin">Messages</h3>
+                  </div>
+
+                  <MessageThreadList
+                    messages={customerHistory.messages}
+                    messageFilter={messageFilter}
+                    onMessageUpdate={handleMessageUpdate}
+                    onThreadMoved={refreshActiveView}
+                    onSelectMessage={setSelectedEmail}
+                    selectedEmail={selectedEmail}
+                  />
+                </>
+              ) : (
+                <div className="entries-block">
+                  <div className="entries-header">
+                    <h3>Course Entries</h3>
+                  </div>
+                  {customerHistory.course_entries.length === 0 ? (
+                    <p className="empty-text">No course entries found for this customer.</p>
+                  ) : (
+                    <ul className="entries-list">
+                      {sortEntriesNewestFirst(customerHistory.course_entries).map((entry) => (
+                        <li key={entry.course_entry_id} className="entry-item">
+                          <strong>Course:</strong> {entry.course_name} | <strong>Date:</strong>{' '}
+                          {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <h3 className="details-subtitle no-margin">Messages (By Thread)</h3>
-              </div>
-
-              <MessageThreadList
-                messages={customerHistory.messages}
-                messageFilter={messageFilter}
-                onMessageUpdate={handleMessageUpdate}
-                onThreadMoved={refreshActiveView}
-              />
-
-              <h3 className="details-subtitle">Course Entries</h3>
-              <div className="entries-container">
-                {customerHistory.course_entries.length === 0 ? (
-                  <p className="empty-text">No course entries found for this customer.</p>
-                ) : (
-                  <ul className="entries-list">
-                    {sortEntriesNewestFirst(customerHistory.course_entries).map((entry) => (
-                      <li key={entry.course_entry_id} className="entry-item">
-                        <strong>Course:</strong> {entry.course_name} | <strong>Date:</strong>{' '}
-                        {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              )}
             </div>
           )}
 
-          {/* All Customers View */}
-          {!loading && showAllCustomers && (
-            <div>
-              <h2 className="details-title">All Customers History</h2>
+          {!loading && !selectedCourse && !selectedCustomer && (
+            <div className="empty-state detail-placeholder">Select a course or customer from the left panel.</div>
+          )}
+        </main>
 
-              <div className="filter-header-no-margin">
-                <div>
-                  <label className="filter-label">Filter:</label>
-                  <select
-                    value={messageFilter}
-                    onChange={(e) => setMessageFilter(e.target.value)}
-                    className="filter-select"
-                  >
-                    <option value="all">All</option>
-                    <option value="true">Needs Response: True</option>
-                    <option value="false">Needs Response: False</option>
-                  </select>
+        <aside className="detail-panel panel">
+          <div className="panel-header">
+            <h2>Selected email</h2>
+          </div>
+
+          {!selectedEmail ? (
+            <div className="empty-state detail-placeholder">Choose a message from the thread list to view it here.</div>
+          ) : (
+            <div className="email-detail">
+              <div className="email-detail__meta">
+                <span className="badge">{selectedEmail.needs_response ? 'Needs response' : 'Resolved'}</span>
+                <span className="email-detail__timestamp">{selectedEmail.sent_at ? new Date(selectedEmail.sent_at).toLocaleString() : ''}</span>
+              </div>
+
+              <div className="selected-email-actions">
+                <button
+                  type="button"
+                  className="btn-reply"
+                  onClick={() => setIsReplying((current) => !current)}
+                >
+                  {isReplying ? 'Hide reply' : 'Reply'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-toggle-status"
+                  onClick={handleToggleNeedsResponse}
+                  disabled={togglingStatus}
+                >
+                  {togglingStatus ? '...' : selectedEmail.needs_response ? 'Resolve' : 'Reopen'}
+                </button>
+              </div>
+
+              <div className="move-message-row">
+                <input
+                  type="number"
+                  placeholder="Move to thread ID"
+                  value={moveThreadTarget}
+                  onChange={(e) => setMoveThreadTarget(e.target.value)}
+                  className="input-target-id"
+                />
+                <button type="button" className="btn-merge" onClick={handleMoveMessage} disabled={movingEmail}>
+                  {movingEmail ? 'Moving...' : 'Move to thread'}
+                </button>
+              </div>
+
+              {isReplying && (
+                <div className="reply-form compact">
+                  <textarea
+                    rows="4"
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder="Type your reply here..."
+                    className="reply-textarea"
+                  />
+                  <div className="reply-actions">
+                    <button type="button" className="btn-send" onClick={handleSendReply} disabled={sendingReply}>
+                      {sendingReply ? 'Sending...' : 'Send'}
+                    </button>
+                    <button type="button" className="btn-cancel" onClick={() => setIsReplying(false)}>
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-                <h3 className="details-subtitle no-margin">All Messages (By Thread)</h3>
-              </div>
+              )}
 
-              <MessageThreadList
-                messages={allCustomersData.messages}
-                messageFilter={messageFilter}
-                onMessageUpdate={handleMessageUpdate}
-                onThreadMoved={refreshActiveView}
-              />
-
-              <h3 className="details-subtitle">All Course Entries</h3>
-              <div className="entries-container">
-                {allCustomersData.course_entries.length === 0 ? (
-                  <p className="empty-text">No course entries found.</p>
-                ) : (
-                  <ul className="entries-list">
-                    {sortEntriesNewestFirst(allCustomersData.course_entries).map((entry) => (
-                      <li key={entry.course_entry_id} className="entry-item">
-                        <strong>Email:</strong> {entry.customer_email || 'Unknown'} | <strong>Course:</strong> {entry.course_name}{' '}
-                        | <strong>Date:</strong> {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <div className="email-body" dangerouslySetInnerHTML={{ __html: selectedEmail.body || '<p>No email body available.</p>' }} />
             </div>
           )}
-        </div>
+        </aside>
       </div>
     </div>
   );
