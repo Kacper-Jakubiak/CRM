@@ -134,10 +134,22 @@ html, body, #root {
   padding: 24px;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
-  overflow-y: auto;
-  text-align: left; /* Changed to left */
+  text-align: left;
   height: 100%;
   box-sizing: border-box;
+  
+  /* --- Change overflow-y to hidden and turn this into a flex column --- */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; 
+}
+
+/* Ensure the active view div fills the height and passes down flex behavior */
+.details-column > div {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 .status-text-info {
@@ -217,6 +229,7 @@ html, body, #root {
 .thread-list-container {
   margin-top: 10px;
   flex: 1;
+  /* max-height: 450px; */
   overflow-y: auto;
   padding-right: 6px;
   border: 1px solid #e2e8f0;
@@ -524,4 +537,61 @@ html, body, #root {
   border-radius: 3px;
   cursor: pointer;
   font-size: 11px;
+}
+
+.courses-list-container {
+  max-height: 35vh;
+  overflow-y: auto;
+}
+
+.customers-list-container {
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.email-actions-group {
+  display: flex;
+  gap: 15px;
+  margin-top: 10px;
+  align-items: center;
+}
+
+.move-message-group {
+  display: flex;
+  gap: 5px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.app-header .app-title {
+  margin: 0;
+}
+
+.btn-refresh {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  background-color: #1d4ed8;
+}
+
+.btn-refresh:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
 }

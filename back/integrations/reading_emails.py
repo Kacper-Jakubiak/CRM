@@ -81,7 +81,7 @@ def fetch_email_ids(mail):
         print(f"Error searching emails: {status}")
         return None
 
-    return messages[0].split()[-50:]
+    return messages[0].split()
 
 
 def process_single_email(mail, e_id, email_classifier):
@@ -97,18 +97,20 @@ def process_single_email(mail, e_id, email_classifier):
 
     if processed_email["sent_to"].lower() != IMAP_USER.lower():
         print(f"Email with ID {e_id.decode()} was not sent to the expected address. Skipping.")
-        print(f"Sent to: {processed_email['sent_to']}, Expected: {IMAP_USER}\n")
+        print(f"Sent to: {processed_email['sent_to']}, Expected: {IMAP_USER}")
         return None, None
 
     if processed_email["customer_email"].lower() == CONFIRMATION_EMAIL.lower():
         course_details = extract_course_details(processed_email["body"])
         email_payload = None
+        print(f"Extracted course details: {course_details}")
         course_payload = course_details | {"sent_at": processed_email["sent_at"]} if course_details else None
     else:
         classifier_email_data = email_classifier.classify_category(processed_email)
         email_payload = processed_email | classifier_email_data | {
             "parent_message_provider_id": find_parent(mail, references)
         }
+        print(f"Classified category: {classifier_email_data['category']}, Needs response: {classifier_email_data['needs_response']}")
         course_payload = None
 
     return email_payload, course_payload
@@ -143,7 +145,7 @@ def process_new_emails(db):
     mail.select("INBOX")
 
     email_ids = fetch_email_ids(mail)
-    if not email_ids:
+    if email_ids is None:
         mail.logout()
         return None
 
@@ -157,9 +159,9 @@ def process_new_emails(db):
     email_payloads = []
     course_payloads = []
 
-    for e_id in email_ids:
+    for idx, e_id in enumerate(email_ids):
+        print(f"Email {e_id.decode()} ({idx+1}/{len(email_ids)}):")
         email_payload, course_payload = process_single_email(mail, e_id, email_classifier)
-        print(f"Processed email ID {e_id.decode()}:")# Email payload: {email_payload}, Course payload: {course_payload}")
 
         if email_payload:
             email_payloads.append(email_payload)
@@ -170,4 +172,7 @@ def process_new_emails(db):
     entry_batch_results = save_entry_batches(db, course_payloads)
 
     mail.logout()
+
+    update_last_pull_date()
+
     return email_batch_results, entry_batch_results

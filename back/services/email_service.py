@@ -10,6 +10,16 @@ from util.schema_translations import to_email_message_reply
 def get_emails(db: Session) -> list[EmailMessageReply]:
     return [to_email_message_reply(message) for message in db.query(EmailMessage).all()]
 
+
+def get_thread_messages(db: Session, thread_id: int) -> list[EmailMessageReply] | None:
+    print(thread_id)
+    thread = db.query(Thread).filter_by(id=thread_id).first()
+    if not thread:
+        return None
+    
+    return [to_email_message_reply(message) for message in db.query(EmailMessage).filter_by(thread_id=thread_id).all()]
+
+
 def ingest_email(
     db: Session,
     provider_message_id: str,
@@ -162,45 +172,44 @@ def get_email(db: Session, provider_message_id: str) -> EmailMessageReply | None
     return to_email_message_reply(message)
 
 
-def move_email_to_thread(
-    db: Session,
-    provider_message_id: str,
-    new_thread_id: int
-) -> EmailMessage | None:
-    message = db.query(EmailMessage).filter_by(
-        provider_message_id=provider_message_id
-    ).first()
+def move_email_to_thread(db: Session, provider_message_id: str, new_thread_id: int) -> EmailMessageReply | None:
+    message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
 
     if not message:
         return None
 
-    thread = db.query(Thread).filter_by(
-        id=new_thread_id
-    ).first()
+    thread = db.query(Thread).filter_by(id=new_thread_id).first()
 
     if not thread:
         return None
 
-    old_thread_id = message.thread_id
 
-    if old_thread_id == new_thread_id:
-        return None
-
-    moved_count = db.query(EmailMessage).filter_by(
-        thread_id=old_thread_id
-    ).update(
-        {
-            EmailMessage.thread_id: new_thread_id
-        },
-        synchronize_session=False
-    )
-
-    db.query(Thread).filter(
-        Thread.id == old_thread_id
-    ).delete(
-        synchronize_session=False
-    )
+    message.thread_id = new_thread_id
 
     db.commit()
 
-    return message
+    return to_email_message_reply(message)
+
+
+def merge_threads(db: Session, old_thread_id: int, new_thread_id: int) -> list[EmailMessageReply] | None:
+    old_thread = db.query(Thread).filter_by(id=old_thread_id).first()
+
+    if not old_thread:
+        return None
+
+    new_thread = db.query(Thread).filter_by(id=new_thread_id).first()
+
+    if not new_thread:
+        return None
+    
+    moved_count = db.query(EmailMessage).filter_by(thread_id=old_thread_id).update({
+        EmailMessage.thread_id: new_thread_id
+    },
+    synchronize_session=False
+    )
+    
+    messages = db.query(EmailMessage).filter_by(thread_id=new_thread_id).all()
+
+    db.commit()
+
+    return [to_email_message_reply(message) for message in messages]

@@ -65,12 +65,15 @@ const normalizeCourseEntries = (payload, fallbackCourseName = '', courseLookup =
   return rawEntries.map((entry) => normalizeCourseEntry(entry, fallbackCourseName, courseLookup, customerLookup));
 };
 
-function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
+function DisplayEmail({ msg, customerEmail, onMessageUpdate, onThreadMoved }) {
   const [replyBody, setReplyBody] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [sending, setSending] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
   const [needsResponse, setNeedsResponse] = useState(msg.needs_response);
+
+  const [targetThreadId, setTargetThreadId] = useState('');
+  const [movingMsg, setMovingMsg] = useState(false);
 
   useEffect(() => {
     setNeedsResponse(msg.needs_response);
@@ -165,6 +168,40 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
     }
   };
 
+  const handleMoveMessage = async () => {
+    if (!targetThreadId.trim()) {
+      alert('Please enter a target Thread ID.');
+      return;
+    }
+
+    setMovingMsg(true);
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/emails/${msg.provider_message_id}/move?new_thread_id=${encodeURIComponent(
+          targetThreadId
+        )}`,
+        { method: 'PATCH' }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to move message');
+      }
+
+      alert('Message moved successfully!');
+      setTargetThreadId('');
+
+      if (onThreadMoved) {
+        onThreadMoved();
+      }
+    } catch (err) {
+      console.error('Error moving message:', err);
+      alert(`Error: ${err.message}`);
+    } finally {
+      setMovingMsg(false);
+    }
+  };
+
   return (
     <li className="email-item">
       <div className="email-header">
@@ -207,12 +244,31 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
             dangerouslySetInnerHTML={{ __html: msg.body }}
           />
         </details>
+        
+        <div className="email-actions-group">
+          {!isReplying && (
+            <button onClick={() => setIsReplying(true)} className="btn-reply">
+              Reply
+            </button>
+          )}
 
-        {!isReplying && (
-          <button onClick={() => setIsReplying(true)} className="btn-reply">
-            Reply
-          </button>
-        )}
+          <div className="move-message-group">
+            <input
+              type="number"
+              placeholder="New Thread ID"
+              value={targetThreadId}
+              onChange={(e) => setTargetThreadId(e.target.value)}
+              className="input-target-id input-move-msg"
+            />
+            <button
+              onClick={handleMoveMessage}
+              disabled={movingMsg}
+              className="btn-merge"
+            >
+              {movingMsg ? 'Moving...' : 'Move Msg'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {isReplying && (
@@ -247,28 +303,68 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate }) {
 
 function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
   const [targetThreadId, setTargetThreadId] = useState('');
-  const [moving, setMoving] = useState(false);
+  const [merging, setMerging] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
 
-  const representativeMsg = messages[0];
-  const displayedMessages = collapsed ? messages.slice(0, 1) : messages;
+  const [threadMessages, setThreadMessages] = useState(messages);
+  const [loadingThread, setLoadingThread] = useState(false);
+  const [hasFetchedFullThread, setHasFetchedFullThread] = useState(false);
 
-  const handleMoveThread = async () => {
+  useEffect(() => {
+    if (!hasFetchedFullThread) {
+      setThreadMessages(messages);
+    }
+  }, [messages, hasFetchedFullThread]);
+
+  const fetchFullThreadMessages = async () => {
+    if (threadId === 'Unassigned') return;
+
+    setLoadingThread(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/emails/threads/${threadId}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to fetch thread emails');
+      }
+
+      const data = await res.json();
+      const normalizedMsgs = normalizeEmailMessages(data);
+      
+      setThreadMessages(normalizedMsgs);
+      setHasFetchedFullThread(true);
+    } catch (err) {
+      console.error(`Error fetching thread #${threadId}:`, err);
+      alert(`Error loading thread #${threadId}: ${err.message}`);
+    } finally {
+      setLoadingThread(false);
+    }
+  };
+
+  const handleToggleCollapse = () => {
+    const willExpand = collapsed;
+    setCollapsed(!collapsed);
+
+    // Auto-fetch complete thread via /api/messages/threads/{thread_id} when expanding for the first time
+    if (willExpand && threadId !== 'Unassigned' && !hasFetchedFullThread) {
+      fetchFullThreadMessages();
+    }
+  };
+
+  const handleMergeThreads = async () => {
     if (!targetThreadId.trim()) {
       alert('Please enter a target Thread ID to merge into.');
       return;
     }
 
     if (parseInt(targetThreadId, 10) === threadId) {
-      alert('Cannot move a thread into itself.');
+      alert('Cannot merge a thread into itself.');
       return;
     }
 
-    setMoving(true);
+    setMerging(true);
     try {
-      const providerMsgId = representativeMsg.provider_message_id;
       const res = await fetch(
-        `${API_BASE_URL}/api/emails/${providerMsgId}/move?new_thread_id=${encodeURIComponent(
+        `${API_BASE_URL}/api/emails/threads/merge?old_thread_id=${threadId}&new_thread_id=${encodeURIComponent(
           targetThreadId
         )}`,
         { method: 'PATCH' }
@@ -276,54 +372,83 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to move thread');
+        throw new Error(errorData.detail || 'Failed to merge threads');
       }
 
-      const data = await res.json();
-      alert(data.detail || 'Thread merged successfully!');
+      alert('Thread merged successfully!');
       setTargetThreadId('');
 
       if (onThreadMoved) {
         onThreadMoved();
       }
     } catch (err) {
-      console.error('Error merging thread:', err);
+      console.error('Error merging threads:', err);
       alert(`Error: ${err.message}`);
     } finally {
-      setMoving(false);
+      setMerging(false);
     }
   };
+
+  const handleLocalMessageUpdate = (updatedMsg) => {
+    setThreadMessages((prev) =>
+      prev.map((m) =>
+        m.provider_message_id === updatedMsg.provider_message_id ? { ...m, ...updatedMsg } : m
+      )
+    );
+    if (onMessageUpdate) {
+      onMessageUpdate(updatedMsg);
+    }
+  };
+
+  const displayedMessages = collapsed ? threadMessages.slice(0, 1) : threadMessages;
 
   return (
     <div className="thread-card">
       <div className={`thread-header ${collapsed ? 'collapsed' : 'expanded'}`}>
         <div className="thread-title-group">
-          <button onClick={() => setCollapsed(!collapsed)} className="btn-collapse">
+          <button onClick={handleToggleCollapse} className="btn-collapse">
             {collapsed ? '▶ Expand' : '▼ Collapse'}
           </button>
           <h4 className="thread-title">
-            Thread #{threadId !== undefined && threadId !== null ? threadId : 'Unassigned'}{' '}
+            Thread #{threadId !== 'Unassigned' ? threadId : 'Unassigned'}{' '}
             <span className="thread-count">
-              ({messages.length} {messages.length === 1 ? 'msg' : 'msgs'})
+              ({threadMessages.length} {threadMessages.length === 1 ? 'msg' : 'msgs'})
             </span>
           </h4>
+
+          {threadId !== 'Unassigned' && (
+            <button
+              onClick={fetchFullThreadMessages}
+              disabled={loadingThread}
+              className="btn-fetch-thread"
+              title="Fetch all messages in this thread from /api/messages/threads/{thread_id}"
+            >
+              {loadingThread ? 'Loading...' : hasFetchedFullThread ? '✓ Synced' : '↻ Fetch Full Thread'}
+            </button>
+          )}
         </div>
 
         <div className="thread-merge-group">
-          <input
-            type="number"
-            placeholder="Target ID"
-            value={targetThreadId}
-            onChange={(e) => setTargetThreadId(e.target.value)}
-            className="input-target-id"
-          />
-          <button
-            onClick={handleMoveThread}
-            disabled={moving}
-            className="btn-merge"
-          >
-            {moving ? '...' : 'Merge'}
-          </button>
+          {threadId !== 'Unassigned' ? (
+            <>
+              <input
+                type="number"
+                placeholder="Merge to ID"
+                value={targetThreadId}
+                onChange={(e) => setTargetThreadId(e.target.value)}
+                className="input-target-id"
+              />
+              <button
+                onClick={handleMergeThreads}
+                disabled={merging}
+                className="btn-merge"
+              >
+                {merging ? 'Merging...' : 'Merge Thread'}
+              </button>
+            </>
+          ) : (
+            <span className="unassigned-notice">Cannot merge unassigned</span>
+          )}
         </div>
       </div>
 
@@ -333,13 +458,14 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
             key={msg.provider_message_id}
             msg={msg}
             customerEmail={msg.customer_email}
-            onMessageUpdate={onMessageUpdate}
+            onMessageUpdate={handleLocalMessageUpdate}
+            onThreadMoved={onThreadMoved}
           />
         ))}
       </ul>
-      {collapsed && messages.length > 1 && (
+      {collapsed && threadMessages.length > 1 && (
         <p className="hidden-msg-text">
-          + {messages.length - 1} older message(s) hidden.
+          + {threadMessages.length - 1} older message(s) hidden.
         </p>
       )}
     </div>
@@ -354,7 +480,7 @@ function MessageThreadList({ messages, messageFilter, onMessageUpdate, onThreadM
   });
 
   if (filteredMessages.length === 0) {
-    return <p className="status-text-info" style={{ marginTop: '10px' }}>No messages found matching the filter.</p>;
+    return <p className="status-text-info mt-10">No messages found matching the filter.</p>;
   }
 
   const groupedMap = filteredMessages.reduce((acc, msg) => {
@@ -405,10 +531,11 @@ function App() {
   const [courseData, setCourseData] = useState({ entries: [], messages: [] });
   const [customerHistory, setCustomerHistory] = useState({ customer: null, messages: [], course_entries: [] });
   const [loading, setLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [messageFilter, setMessageFilter] = useState('all');
 
-  useEffect(() => {
+  const fetchCoursesAndCustomers = () => {
     fetch(`${API_BASE_URL}/api/courses`)
       .then((res) => res.json())
       .then((data) => setCourses(normalizeCollection(data, 'courses')))
@@ -418,6 +545,10 @@ function App() {
       .then((res) => res.json())
       .then((data) => setCustomers(normalizeCollection(data, 'customers')))
       .catch((err) => console.error('Error fetching customers:', err));
+  };
+
+  useEffect(() => {
+    fetchCoursesAndCustomers();
   }, []);
 
   const handleCourseClick = async (courseName) => {
@@ -526,6 +657,46 @@ function App() {
     }
   };
 
+  const handleSyncData = async () => {
+    setIsSyncing(true);
+    try {
+      // Step 1: Import courses FIRST
+      const coursesRes = await fetch(`${API_BASE_URL}/api/courses/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!coursesRes.ok) {
+        const errorData = await coursesRes.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to import courses');
+      }
+
+      // Step 2: Pull emails ONLY AFTER course import completes
+      const emailsRes = await fetch(`${API_BASE_URL}/api/integrations/emails/pull`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!emailsRes.ok) {
+        const errorData = await emailsRes.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to pull emails');
+      }
+
+      // Step 3: Re-fetch sidebar list and active panel content
+      fetchCoursesAndCustomers();
+      refreshActiveView();
+    } catch (err) {
+      console.error('Error during sync:', err);
+      alert(`Sync error: ${err.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleMessageUpdate = (updatedMsg) => {
     setCourseData((prev) => ({
       ...prev,
@@ -551,14 +722,23 @@ function App() {
 
   return (
     <div className="app-container">
-      <h1 className="app-title">Email CRM Dashboard</h1>
+      <header className="app-header">
+        <h1 className="app-title">Email CRM Dashboard</h1>
+        <button
+          onClick={handleSyncData}
+          disabled={isSyncing}
+          className="btn-refresh"
+        >
+          {isSyncing ? '↻ Syncing Data...' : '↻ Sync Data'}
+        </button>
+      </header>
 
       <div className="dashboard-grid">
         <div className="lists-column">
           {/* Courses Section */}
-          <section style={{ marginBottom: '20px' }}>
+          <section className="courses-section">
             <h2 className="section-title">Courses</h2>
-            <div className="list-container">
+            <div className="list-container courses-list-container">
               <ul className="list">
                 {courses.map((course) => (
                   <li key={course.course_id} className="list-item">
@@ -577,8 +757,7 @@ function App() {
           {/* Customers Section */}
           <section>
             <div className="all-customers-header">
-              {/* Swapped these two lines so heading is left, button is right */}
-              <h2 className="section-title" style={{ margin: 0 }}>Customers</h2>
+              <h2 className="section-title no-margin">Customers</h2>
               <button
                 onClick={handleAllCustomersClick}
                 className={`btn-all-customers ${showAllCustomers ? 'active' : ''}`}
@@ -586,7 +765,7 @@ function App() {
                 All
               </button>
             </div>
-            <div className="list-container customers">
+            <div className="list-container customers-list-container">
               <ul className="list">
                 {customers.map((customer) => (
                   <li key={customer.customer_id} className="list-item">
@@ -617,7 +796,7 @@ function App() {
             <div>
               <h2 className="details-title">Course Details: {selectedCourse}</h2>
 
-              <h3 className="details-subtitle" style={{ marginTop: 0 }}>Entries</h3>
+              <h3 className="details-subtitle no-margin-top">Entries</h3>
               <div className="entries-container">
                 {courseData.entries.length === 0 ? (
                   <p className="empty-text">No entries found for this course.</p>
@@ -633,7 +812,7 @@ function App() {
                 )}
               </div>
 
-              <div className="filter-header">
+              <div className="filter-header mt-10">
                 <div>
                   <label className="filter-label">Filter:</label>
                   <select
@@ -646,7 +825,7 @@ function App() {
                     <option value="false">Needs Response: False</option>
                   </select>
                 </div>
-                <h3 className="details-subtitle" style={{ margin: 0 }}>Related Messages (By Thread)</h3>
+                <h3 className="details-subtitle no-margin">Related Messages (By Thread)</h3>
               </div>
 
               <MessageThreadList
@@ -676,7 +855,7 @@ function App() {
                     <option value="false">Needs Response: False</option>
                   </select>
                 </div>
-                <h3 className="details-subtitle" style={{ margin: 0 }}>Messages (By Thread)</h3>
+                <h3 className="details-subtitle no-margin">Messages (By Thread)</h3>
               </div>
 
               <MessageThreadList
@@ -722,7 +901,7 @@ function App() {
                     <option value="false">Needs Response: False</option>
                   </select>
                 </div>
-                <h3 className="details-subtitle" style={{ margin: 0 }}>All Messages (By Thread)</h3>
+                <h3 className="details-subtitle no-margin">All Messages (By Thread)</h3>
               </div>
 
               <MessageThreadList

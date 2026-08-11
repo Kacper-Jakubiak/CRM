@@ -31,12 +31,11 @@ def send_email(
 
     msg.attach(MIMEText(body, "plain"))
 
-    print(msg.as_string())
-    return "OK"
+    # print(msg.as_string())
+    # return "OK"
 
     try:
-        # Connect to the SMTP server securely using SSL
-        print(f"Connecting to SMTP server {SMTP_SERVER}:{SMTP_PORT}...")
+        # print(f"Connecting to SMTP server {SMTP_SERVER}:{SMTP_PORT}...")
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())

@@ -17,7 +17,6 @@ def list_emails(db: Session = Depends(get_db)):
     return email_messages
 
 
-
 @router.post("", status_code=status.HTTP_201_CREATED)
 def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
     email_message = email_service.ingest_email(
@@ -40,12 +39,57 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
 
 @router.post("/batch", status_code=status.HTTP_201_CREATED, response_model=list[EmailMessageReply])
 def batch_ingest_emails(payload: EmailBatchIngestRequest, db: Session = Depends(get_db)):
-    email_messages =  email_service.ingest_email_batch(db, [message.model_dump() for message in payload.messages])
+    email_messages = email_service.ingest_email_batch(db, [message.model_dump() for message in payload.messages])
 
     if email_messages is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email messages not found")
 
     return email_messages
+
+
+# ------------------------------------------------------------------
+# THREAD ROUTES (Must be placed BEFORE dynamic /{provider_message_id} routes)
+# ------------------------------------------------------------------
+
+@router.patch("/threads/merge", response_model=list[EmailMessageReply])
+def merge_threads(old_thread_id: int, new_thread_id: int, db: Session = Depends(get_db)):
+    email_messages = email_service.merge_threads(
+        db=db,
+        old_thread_id=old_thread_id,
+        new_thread_id=new_thread_id
+    )
+
+    if email_messages is None:
+        raise HTTPException(
+            status_code=404,
+            detail="One or both threads not found"
+        )
+
+    return email_messages
+
+
+@router.get("/threads/{thread_id}", response_model=list[EmailMessageReply])
+def get_thread_messages(thread_id: int, db: Session = Depends(get_db)):
+    print(f"Fetching thread ID: {thread_id}")
+    email_messages = email_service.get_thread_messages(db, thread_id)
+
+    if email_messages is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Thread not found"
+        )
+
+    return email_messages
+
+
+@router.get("/{provider_message_id}", response_model=EmailMessageReply)
+def get_message(provider_message_id: str, db: Session = Depends(get_db)):
+    email_message = email_service.get_email(db, provider_message_id)
+
+    if email_message is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+
+    return email_message
 
 
 @router.patch("/{provider_message_id}/status", response_model=EmailMessageReply)
@@ -65,37 +109,18 @@ def update_message_status(provider_message_id: str, needs_response: bool, db: Se
     return email_message
 
 
-@router.get("/{provider_message_id}", response_model=EmailMessageReply)
-def get_message(provider_message_id: str, db: Session = Depends(get_db)):
-    email_message = email_service.get_email(db, provider_message_id )
-
-    if email_message is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
-
-    return email_message
-
-
-@router.patch("/{provider_message_id}/move", response_model=str)
-def move_message_to_thread(
-    provider_message_id: str,
-    new_thread_id: int,
-    db: Session = Depends(get_db)
-):
-    result = email_service.move_email_to_thread(
+@router.patch("/{provider_message_id}/move", response_model=EmailMessageReply)
+def move_message_to_thread(provider_message_id: str, new_thread_id: int, db: Session = Depends(get_db)):
+    email_message = email_service.move_email_to_thread(
         db=db,
         provider_message_id=provider_message_id,
         new_thread_id=new_thread_id
     )
 
-    if result is None:
+    if email_message is None:
         raise HTTPException(
             status_code=404,
             detail="Message or thread not found"
         )
 
-    return (
-        f"Successfully merged thread "
-        f"{result['old_thread_id']} "
-        f"({result['moved_count']} messages) "
-        f"into thread {result['new_thread_id']}."
-    )
+    return email_message
