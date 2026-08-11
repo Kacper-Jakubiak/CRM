@@ -11,6 +11,29 @@ const sortEntriesNewestFirst = (entries) => {
   });
 };
 
+const groupEntriesByDate = (entries) => {
+  const grouped = entries.reduce((acc, entry) => {
+    const dateKey = entry.course_date ? new Date(entry.course_date).toISOString().slice(0, 10) : 'No date';
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(entry);
+    return acc;
+  }, {});
+
+  return Object.entries(grouped)
+    .map(([dateKey, items]) => ({
+      dateKey,
+      dateLabel: dateKey === 'No date' ? 'No date' : new Date(dateKey).toLocaleDateString(),
+      items: sortEntriesNewestFirst(items),
+    }))
+    .sort((a, b) => {
+      if (a.dateKey === 'No date') return 1;
+      if (b.dateKey === 'No date') return -1;
+      return b.dateKey.localeCompare(a.dateKey);
+    });
+};
+
 function DisplayEmail({ msg, customerEmail, onSelectMessage }) {
   const emailAddress = customerEmail || msg.sender || 'Unknown';
 
@@ -239,7 +262,7 @@ function App() {
   const [theme, setTheme] = useState('dark');
   const [courses, setCourses] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [selectedCourse, setSelectedCourse] = useState('All');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [courseData, setCourseData] = useState({ entries: [], messages: [] });
   const [customerHistory, setCustomerHistory] = useState({ customer: null, messages: [], course_entries: [] });
@@ -276,6 +299,7 @@ function App() {
 
   useEffect(() => {
     fetchCoursesAndCustomers();
+    handleAllCourseEntries();
   }, []);
 
   const handleCourseClick = async (courseName) => {
@@ -585,7 +609,7 @@ function App() {
             <h2>{view === 'courses' ? 'Courses' : 'Customers'}</h2>
           </div>
 
-          <div className="list-panel">
+          <div className="all-button-row">
             <button
               type="button"
               className={
@@ -603,7 +627,9 @@ function App() {
             >
               All
             </button>
+          </div>
 
+          <div className="list-panel">
             {listItems.length === 0 ? (
               <div className="empty-state small">No records available.</div>
             ) : (
@@ -667,10 +693,16 @@ function App() {
                     <p className="empty-text">No entries found for this course.</p>
                   ) : (
                     <ul className="entries-list">
-                      {sortEntriesNewestFirst(courseData.entries).map((entry) => (
-                        <li key={entry.course_entry_id} className="entry-item">
-                          <strong>Email:</strong> {entry.customer_email || 'Unknown'} | <strong>Course Date:</strong>{' '}
-                          {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
+                      {groupEntriesByDate(courseData.entries).map((group) => (
+                        <li key={group.dateKey} className="entry-group">
+                          <div className="entry-group-title">Date: {group.dateLabel}</div>
+                          <ul className="group-entry-list">
+                            {group.items.map((entry) => (
+                              <li key={entry.course_entry_id} className="entry-item">
+                                <strong>Email:</strong> {entry.customer_email || 'Unknown'}
+                              </li>
+                            ))}
+                          </ul>
                         </li>
                       ))}
                     </ul>
@@ -758,10 +790,16 @@ function App() {
                     <p className="empty-text">No course entries found for this customer.</p>
                   ) : (
                     <ul className="entries-list">
-                      {sortEntriesNewestFirst(customerHistory.course_entries).map((entry) => (
-                        <li key={entry.course_entry_id} className="entry-item">
-                          <strong>Course:</strong> {entry.course_name} | <strong>Date:</strong>{' '}
-                          {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
+                      {groupEntriesByDate(customerHistory.course_entries).map((group) => (
+                        <li key={group.dateKey} className="entry-group">
+                          <div className="entry-group-title">Date: {group.dateLabel}</div>
+                          <ul className="group-entry-list">
+                            {group.items.map((entry) => (
+                              <li key={entry.course_entry_id} className="entry-item">
+                                <strong>Course:</strong> {entry.course_name}
+                              </li>
+                            ))}
+                          </ul>
                         </li>
                       ))}
                     </ul>

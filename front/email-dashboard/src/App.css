@@ -74,6 +74,7 @@ button {
   margin: 0;
   font-size: 1.7rem;
   font-weight: 700;
+  color: var(--text);
 }
 
 .topbar-actions {
@@ -107,9 +108,10 @@ button {
 
 .dashboard-shell {
   display: grid;
-  grid-template-columns: minmax(210px, 250px) minmax(320px, 1fr) minmax(380px, 1.2fr);
+  grid-template-columns: minmax(240px, 300px) minmax(280px, 1fr) minmax(340px, 1.2fr);
   gap: 12px;
   min-height: calc(100vh - 86px);
+  height: calc(100vh - 86px);
 }
 
 .panel {
@@ -117,6 +119,7 @@ button {
   border: 1px solid var(--line);
   border-radius: 10px;
   box-shadow: var(--shadow);
+  min-height: 0;
 }
 
 .sidebar,
@@ -125,6 +128,18 @@ button {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.content-panel {
+  overflow: hidden;
+}
+
+.content-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .panel-header {
@@ -136,6 +151,7 @@ button {
   margin: 0;
   font-size: 0.96rem;
   font-weight: 700;
+  color: var(--text);
 }
 
 .segment-toggle {
@@ -167,14 +183,18 @@ button {
   gap: 4px;
   padding: 8px 8px 10px;
   overflow-y: auto;
+  overflow-x: hidden;
   max-height: calc(100vh - 220px);
   min-height: 0;
 }
 
 .list-item {
-  width: 100%;
+  display: block;
+  width: auto;
+  align-self: stretch;
   text-align: left;
-  padding: 0.56rem 0.72rem;
+  padding: 0.6rem 0.9rem;
+  margin: 0 6px;
   border-radius: 7px;
   border: 1px solid var(--line);
   border-left: 2px solid transparent;
@@ -182,13 +202,20 @@ button {
   color: var(--text);
   font-size: 0.75rem;
   transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .all-button {
   font-weight: 700;
   background: var(--accent-soft);
   border-left-color: var(--accent);
-  margin-bottom: 2px;
+  margin: 0 6px 2px;
+  padding: 0.6rem 0.9rem;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .list-item.active {
@@ -205,6 +232,7 @@ button {
   display: flex;
   flex-direction: column;
   min-height: 100%;
+  overflow: hidden;
 }
 
 .status-text-info {
@@ -216,6 +244,10 @@ button {
 
 .entries-block {
   padding: 10px 14px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .entries-header h3,
@@ -223,14 +255,42 @@ button {
   margin: 0 0 6px;
   font-size: 0.82rem;
   font-weight: 700;
+  color: var(--text);
 }
 
 .entries-list {
   margin: 0;
-  padding-left: 18px;
-  list-style-position: outside;
+  padding-left: 0;
+  list-style: none;
   font-size: 0.8rem;
   line-height: 1.6;
+}
+
+.entry-group {
+  margin-bottom: 14px;
+}
+
+.entry-group-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text);
+  text-align: left;
+  position: relative;
+  padding-left: 18px;
+}
+
+.entry-group-title::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  top: 0.05em;
+  color: var(--muted);
+}
+
+.group-entry-list {
+  margin: 0;
+  padding-left: 16px;
+  list-style: none;
 }
 
 .entry-item {
@@ -238,6 +298,8 @@ button {
   padding: 0.35rem 0.4rem;
   border-radius: 6px;
   color: var(--text);
+  text-align: left;
+  list-style: none;
 }
 
 .empty-text {
@@ -299,7 +361,9 @@ button {
   margin: 10px 10px 0;
   padding: 0 2px 8px;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .thread-card {
@@ -404,7 +468,7 @@ button {
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--panel);
-  padding: 6px 8px;
+  padding: 5px 7px;
   list-style: none;
   cursor: pointer;
 }
@@ -414,17 +478,17 @@ button {
   justify-content: space-between;
   align-items: flex-start;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .email-subject {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   word-break: break-word;
   flex: 1;
 }
 
 .email-timestamp {
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -622,6 +686,8 @@ button {
   color: var(--text);
   overflow-wrap: anywhere;
   font-size: 0.72rem;
+  white-space: pre-wrap;
+  text-align: left;
 }
 
 .email-body p {
