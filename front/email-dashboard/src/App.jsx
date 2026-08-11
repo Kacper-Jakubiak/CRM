@@ -3,66 +3,12 @@ import './App.css';
 
 const API_BASE_URL = 'http://localhost:8000';
 
-const normalizeEmailMessage = (message = {}) => ({
-  ...message,
-  provider_message_id: message.provider_message_id ?? message.id ?? message.providerId ?? '',
-  customer_email: message.customer_email ?? message.email ?? message.customerEmail ?? message.sender ?? message.from_address ?? message.fromAddress ?? message.recipient_email ?? message.recipientEmail ?? '',
-  subject: message.subject ?? '',
-  body: message.body ?? '',
-  needs_response: message.needs_response ?? message.needsResponse ?? false,
-  thread_id: message.thread_id ?? message.threadId ?? null,
-  sent_at: message.sent_at ?? message.sentAt ?? message.timestamp ?? null,
-});
-
-const normalizeEmailMessages = (payload) => {
-  const rawMessages = Array.isArray(payload)
-    ? payload
-    : payload?.messages || payload?.email_messages || payload?.emailMessages || (payload?.message || payload?.email_message ? [payload.message || payload.email_message] : []);
-
-  return rawMessages.map(normalizeEmailMessage);
-};
-
-const normalizeCollection = (payload, key) => {
-  if (Array.isArray(payload)) {
-    return payload;
-  }
-
-  if (payload && typeof payload === 'object') {
-    const candidates = [payload[key], payload.data, payload.items, payload.results];
-    for (const candidate of candidates) {
-      if (Array.isArray(candidate)) {
-        return candidate;
-      }
-    }
-  }
-
-  return [];
-};
-
-const normalizeCourseEntry = (entry = {}, fallbackCourseName = '', courseLookup = {}, customerLookup = {}) => ({
-  ...entry,
-  course_entry_id: entry.course_entry_id ?? entry.entry_id ?? entry.id ?? entry.courseEntryId ?? '',
-  customer_email:
-    entry.customer_email ??
-    entry.customerEmail ??
-    entry.email ??
-    entry.customer?.email ??
-    entry.customer?.customer_email ??
-    customerLookup[entry.customer_id]?.customer_email ??
-    customerLookup[entry.customer_id]?.email ??
-    customerLookup[entry.customer?.id]?.customer_email ??
-    customerLookup[entry.customer?.id]?.email ??
-    '',
-  course_name: entry.course_name ?? entry.courseName ?? entry.name ?? courseLookup[entry.course_id]?.course_name ?? courseLookup[entry.course_id]?.name ?? fallbackCourseName ?? '',
-  course_date: entry.course_date ?? entry.courseDate ?? entry.date ?? entry.sent_at ?? entry.sentAt ?? null,
-});
-
-const normalizeCourseEntries = (payload, fallbackCourseName = '', courseLookup = {}, customerLookup = {}) => {
-  const rawEntries = Array.isArray(payload)
-    ? payload
-    : payload?.course_entries || payload?.entries || payload?.courseEntries || [];
-
-  return rawEntries.map((entry) => normalizeCourseEntry(entry, fallbackCourseName, courseLookup, customerLookup));
+const sortEntriesNewestFirst = (entries) => {
+  return [...entries].sort((a, b) => {
+    const dateA = a.course_date ? new Date(a.course_date).getTime() : 0;
+    const dateB = b.course_date ? new Date(b.course_date).getTime() : 0;
+    return dateB - dateA;
+  });
 };
 
 function DisplayEmail({ msg, customerEmail, onMessageUpdate, onThreadMoved }) {
@@ -79,7 +25,7 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate, onThreadMoved }) {
     setNeedsResponse(msg.needs_response);
   }, [msg.needs_response]);
 
-  const emailAddress = customerEmail || msg.customer_email || 'Unknown';
+  const emailAddress = customerEmail || msg.sender || 'Unknown';
 
   const handleToggleNeedsResponse = async () => {
     const newStatus = !needsResponse;
@@ -97,8 +43,7 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate, onThreadMoved }) {
 
       const freshMsgRes = await fetch(`${API_BASE_URL}/api/emails/${msg.provider_message_id}`);
       if (freshMsgRes.ok) {
-        const freshData = await freshMsgRes.json();
-        const updatedMessage = normalizeEmailMessage(freshData.message ?? freshData.email_message ?? freshData);
+        const updatedMessage = await freshMsgRes.json();
 
         setNeedsResponse(updatedMessage.needs_response);
 
@@ -147,8 +92,7 @@ function DisplayEmail({ msg, customerEmail, onMessageUpdate, onThreadMoved }) {
 
       const freshMsgRes = await fetch(`${API_BASE_URL}/api/emails/${msg.provider_message_id}`);
       if (freshMsgRes.ok) {
-        const freshData = await freshMsgRes.json();
-        const updatedMessage = normalizeEmailMessage(freshData.message ?? freshData.email_message ?? freshData);
+        const updatedMessage = await freshMsgRes.json();
 
         setNeedsResponse(updatedMessage.needs_response);
 
@@ -328,9 +272,8 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved }) {
       }
 
       const data = await res.json();
-      const normalizedMsgs = normalizeEmailMessages(data);
-      
-      setThreadMessages(normalizedMsgs);
+      const sortedData = [...data].sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
+      setThreadMessages(sortedData);
       setHasFetchedFullThread(true);
     } catch (err) {
       console.error(`Error fetching thread #${threadId}:`, err);
@@ -538,12 +481,12 @@ function App() {
   const fetchCoursesAndCustomers = () => {
     fetch(`${API_BASE_URL}/api/courses`)
       .then((res) => res.json())
-      .then((data) => setCourses(normalizeCollection(data, 'courses')))
+      .then((data) => setCourses(Array.isArray(data) ? data : []))
       .catch((err) => console.error('Error fetching courses:', err));
 
     fetch(`${API_BASE_URL}/api/customers`)
       .then((res) => res.json())
-      .then((data) => setCustomers(normalizeCollection(data, 'customers')))
+      .then((data) => setCustomers(Array.isArray(data) ? data : []))
       .catch((err) => console.error('Error fetching customers:', err));
   };
 
@@ -566,12 +509,10 @@ function App() {
 
       const entriesData = await entriesRes.json();
       const messagesData = await messagesRes.json();
-      const courseLookup = Object.fromEntries((courses || []).map((course) => [course.course_id, course]));
-      const customerLookup = Object.fromEntries((customers || []).map((customer) => [customer.customer_id, customer]));
 
       setCourseData({
-        entries: normalizeCourseEntries(entriesData, courseName, courseLookup, customerLookup),
-        messages: normalizeEmailMessages(messagesData),
+        entries: entriesData,
+        messages: messagesData,
       });
     } catch (err) {
       console.error('Error fetching course details:', err);
@@ -595,12 +536,11 @@ function App() {
 
       const entriesData = await entriesRes.json();
       const messagesData = await messagesRes.json();
-      const customerLookup = Object.fromEntries((customers || []).map((customer) => [customer.customer_id, customer]));
 
       setCustomerHistory({
         customer: messagesData.customer || entriesData.customer || { email },
-        messages: normalizeEmailMessages(messagesData),
-        course_entries: normalizeCourseEntries(entriesData, '', {}, customerLookup),
+        messages: messagesData,
+        course_entries: entriesData,
       });
     } catch (err) {
       console.error('Error fetching customer history:', err);
@@ -631,13 +571,9 @@ function App() {
         entriesRes.json(),
       ]);
 
-      const allMessages = normalizeEmailMessages(messagesData);
-      const customerLookup = Object.fromEntries((customers || []).map((customer) => [customer.customer_id, customer]));
-      const allEntries = normalizeCourseEntries(entriesData, '', {}, customerLookup);
-
       setAllCustomersData({
-        messages: allMessages,
-        course_entries: allEntries,
+        messages: messagesData,
+        course_entries: entriesData,
       });
     } catch (err) {
       console.error('Error fetching all customers history:', err);
@@ -802,7 +738,7 @@ function App() {
                   <p className="empty-text">No entries found for this course.</p>
                 ) : (
                   <ul className="entries-list">
-                    {courseData.entries.map((entry) => (
+                    {sortEntriesNewestFirst(courseData.entries).map((entry) => (
                       <li key={entry.course_entry_id} className="entry-item">
                         <strong>Email:</strong> {entry.customer_email || 'Unknown'} | <strong>Course Date:</strong>{' '}
                         {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
@@ -871,7 +807,7 @@ function App() {
                   <p className="empty-text">No course entries found for this customer.</p>
                 ) : (
                   <ul className="entries-list">
-                    {customerHistory.course_entries.map((entry) => (
+                    {sortEntriesNewestFirst(customerHistory.course_entries).map((entry) => (
                       <li key={entry.course_entry_id} className="entry-item">
                         <strong>Course:</strong> {entry.course_name} | <strong>Date:</strong>{' '}
                         {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
@@ -917,7 +853,7 @@ function App() {
                   <p className="empty-text">No course entries found.</p>
                 ) : (
                   <ul className="entries-list">
-                    {allCustomersData.course_entries.map((entry) => (
+                    {sortEntriesNewestFirst(allCustomersData.course_entries).map((entry) => (
                       <li key={entry.course_entry_id} className="entry-item">
                         <strong>Email:</strong> {entry.customer_email || 'Unknown'} | <strong>Course:</strong> {entry.course_name}{' '}
                         | <strong>Date:</strong> {entry.course_date ? new Date(entry.course_date).toLocaleDateString() : '—'}
