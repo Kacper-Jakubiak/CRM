@@ -6,20 +6,6 @@ from db import Customer, CourseEntry, EmailMessage, Company
 from schemas import CourseEntryReply, EmailMessageReply
 from util.schema_translations import to_email_message_reply, to_entry_reply
 
-def add_customer_note(db:Session, email_address: str, note_text: str) -> Customer | None:
-    customer = get_customer_by_email(db, email_address)
-    if customer is None:
-        return None
-    
-    customer.note = note_text
-    db.commit()
-    db.refresh(customer)
-    return customer
-
-
-def get_customers(db: Session) -> list[Customer]:
-    return db.query(Customer).all()
-
 
 def add_customer(db: Session, name: str, email_address: str) -> Customer:
     customer = get_customer_by_email(db, email_address)
@@ -41,6 +27,21 @@ def add_customer(db: Session, name: str, email_address: str) -> Customer:
     db.commit()
 
     return customer
+
+
+def add_customer_note(db:Session, email_address: str, note_text: str) -> Customer | None:
+    customer = get_customer_by_email(db, email_address)
+    if customer is None:
+        return None
+    
+    customer.note = note_text
+    db.commit()
+    db.refresh(customer)
+    return customer
+
+
+def get_customers(db: Session) -> list[Customer]:
+    return db.query(Customer).all()
 
 
 def get_customer_by_email(db: Session, email_address: str) -> Customer | None:
