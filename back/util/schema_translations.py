@@ -1,5 +1,5 @@
-from db import CourseEntry, EmailMessage
-from schemas import CourseEntryReply, EmailMessageReply
+from db import CourseEntry, EmailMessage, Customer
+from schemas import CourseEntryReply, EmailMessageReply, CustomerReply
 
 
 def to_email_message_reply(message: EmailMessage) -> EmailMessageReply:
@@ -26,4 +26,14 @@ def to_entry_reply(entry: CourseEntry, course_name: str, customer_email: str) ->
         course_name=course_name,
         course_date=entry.course_date.isoformat(),
         sent_at=entry.sent_at.isoformat(),
+    )
+
+def to_customer_reply(customer: Customer, company_name: str) -> CustomerReply:
+    return CustomerReply(
+        customer_id=customer.id,
+        customer_email=customer.email,
+        customer_name=customer.name,
+        customer_note=customer.note,
+        company_id=customer.company_id,
+        company_name=company_name
     )

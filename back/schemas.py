@@ -30,8 +30,10 @@ class CourseReply(BaseModel):
 class CustomerReply(BaseModel):
     customer_id: int
     customer_email: EmailStr
+    customer_name: str
     customer_note: str
     company_id: int
+    company_name: str
 
 class CourseEntryReply(BaseModel):
     entry_id: int
@@ -60,7 +62,3 @@ class EmailSendRequest(BaseModel):
     body: str
     reply_message_id: Optional[str] = None
     should_add_html: bool = False
-
-class PullEmailsReply(BaseModel):
-    email_batch: List[EmailMessageReply]
-    entry_batch: List[CourseEntryReply]

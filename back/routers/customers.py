@@ -10,18 +10,10 @@ router = APIRouter(
     tags=["customers"]
 )
 
-
 @router.get("", response_model=list[CustomerReply])
 def get_customers(db: Session = Depends(get_db)):
     customers = customer_service.get_customers(db)
-    return [
-        CustomerReply(
-            customer_id=customer.id,
-            customer_email=customer.email,
-            customer_note=customer.note,
-            company_id=customer.company_id
-        )
-        for customer in customers]
+    return customers
 
 
 @router.get("/{email_address}/entries", response_model=list[CourseEntryReply])
@@ -52,9 +44,4 @@ def patch_customer_note(email_address: str, note_text: str, db: Session = Depend
     if customer is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
     
-    return CustomerReply(
-            customer_id=customer.id,
-            customer_email=customer.email,
-            customer_note=customer.note,
-            company_id=customer.company_id
-        )
+    return customer
