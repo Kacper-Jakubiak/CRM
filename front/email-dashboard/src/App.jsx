@@ -631,16 +631,17 @@ function App() {
     .filter((c) => {
       if (!q) return true;
       const email = (c.customer_email || '').toLowerCase();
+      const name = (c.customer_name || '').toLowerCase();
       const note = (c.customer_note || c.note || '').toLowerCase();
-      const company = c.company_id ? String(c.company_id) : '';
-      return email.includes(q) || note.includes(q) || company.includes(q);
+      const company = (c.company_name || c.company_id ? String(c.company_id) : '').toLowerCase();
+      return email.includes(q) || name.includes(q) || note.includes(q) || company.includes(q);
     })
     .slice();
   filteredCustomers.sort((a, b) => (a.customer_email || '').localeCompare(b.customer_email || ''));
 
   const customersByCompany = Object.entries(
     filteredCustomers.reduce((acc, c) => {
-      const key = c.company_id ?? 'No company';
+      const key = c.company_name ?? 'No company';
       if (!acc[key]) acc[key] = [];
       acc[key].push(c);
       return acc;
@@ -650,8 +651,6 @@ function App() {
   return (
     <div className={`app-shell theme-${theme}`}>
       <header className="topbar">
-
-
         <div className="topbar-actions">
           <button className="theme-toggle" onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} type="button">
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
@@ -703,8 +702,6 @@ function App() {
             </button>
           </div>
 
-          
-
           <div className="list-panel">
             {view === 'courses' ? (
               filteredCourses.length === 0 ? (
@@ -725,9 +722,9 @@ function App() {
               customersByCompany.length === 0 ? (
                 <div className="empty-state small">No customers match.</div>
               ) : (
-                customersByCompany.map(([companyId, custs]) => (
-                  <div key={companyId} className="company-group">
-                    <div className="company-header">{companyId === 'No company' ? 'No company' : `Company ${companyId}`}</div>
+                customersByCompany.map(([companyName, custs]) => (
+                  <div key={companyName} className="company-group">
+                    <div className="company-header">{companyName}</div>
                       {custs.map((item) => (
                         <button
                           key={item.customer_id}
@@ -735,7 +732,14 @@ function App() {
                           onClick={() => handleCustomerClick(item.customer_email)}
                           type="button"
                         >
-                          <span className="list-item-email">{item.customer_email}</span>
+                          <div className="list-item-customer-details" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                            {item.customer_name && (
+                              <span className="list-item-name" style={{ fontWeight: 'bold' }}>
+                                {item.customer_name}
+                              </span>
+                            )}
+                            <span className="list-item-email">{item.customer_email}</span>
+                          </div>
                           <span className="list-item-note">{item.customer_note || item.note || ''}</span>
                         </button>
                       ))}
@@ -826,42 +830,45 @@ function App() {
           {!loading && selectedCustomer && (
             <div className="content-inner">
               <div className="panel-header">
-                    <h2>Customer history: {customerHistory.customer?.email || selectedCustomer}</h2>
-                  </div>
+                <h2>
+                  Customer history: {
+                    customerHistory.customer?.customer_name
+                      ? `${customerHistory.customer.customer_name} (${customerHistory.customer?.customer_email || customerHistory.customer?.email || selectedCustomer})`
+                      : (customerHistory.customer?.customer_email || customerHistory.customer?.email || selectedCustomer)
+                  }
+                </h2>
+              </div>
 
-                  {customerHistory.customer && (
-                    <div className="customer-meta">
-                      {customerHistory.customer.company_id && (
-                        <div className="customer-company">Company ID: {customerHistory.customer.company_id}</div>
-                      )}
-                    </div>
+              {customerHistory.customer && (
+                <div className="customer-meta">
+                  {customerHistory.customer.company_name && (
+                    <div className="customer-company">Company: {customerHistory.customer.company_name}</div>
                   )}
+                </div>
+              )}
 
-                  {/* Note display + editor in middle column, left-aligned, same height */}
-                  {customerHistory.customer && selectedCustomer && selectedCustomer !== 'All' && (
-                    <div className="note-row">
-                      <div className="note-flex">
-                        <div className="note-display">{customerHistory.customer.note || ''}</div>
-                      </div>
+              {/* Editable note input spanning the full column width */}
+              {customerHistory.customer && selectedCustomer && selectedCustomer !== 'All' && (
+                <div className="note-row" style={{ width: '100%', display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    value={customerNote}
+                    onChange={(e) => setCustomerNote(e.target.value)}
+                    placeholder="Edit note..."
+                    className="note-input"
+                    style={{ flex: 1, width: '100%' }}
+                  />
 
-                      <input
-                        type="text"
-                        value={customerNote}
-                        onChange={(e) => setCustomerNote(e.target.value)}
-                        placeholder="Edit note"
-                        className="note-input"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={handleSaveCustomerNote}
-                        disabled={savingCustomerNote}
-                        className="note-save-button"
-                      >
-                        {savingCustomerNote ? 'Saving...' : 'Save'}
-                      </button>
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleSaveCustomerNote}
+                    disabled={savingCustomerNote}
+                    className="note-save-button"
+                  >
+                    {savingCustomerNote ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              )}
 
               <div className="detail-toggle-row">
                 <button
