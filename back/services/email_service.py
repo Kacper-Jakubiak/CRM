@@ -2,9 +2,10 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from db import Customer, EmailMessage, Thread
+from db import EmailMessage, Thread
 from schemas import EmailMessageReply
 from util.schema_translations import to_email_message_reply
+from customer_service import add_customer
 
 
 def get_emails(db: Session) -> list[EmailMessageReply]:
@@ -39,7 +40,6 @@ def ingest_email(
 
     if parent_message_provider_id:
         parent = db.query(EmailMessage).filter_by(provider_message_id=parent_message_provider_id).first()
-
         if parent:
             thread_id = parent.thread_id
 
@@ -49,12 +49,7 @@ def ingest_email(
         db.flush()
         thread_id = thread.id
 
-    customer = db.query(Customer).filter_by(email=customer_email).first()
-
-    if not customer:
-        customer = Customer(email=customer_email)
-        db.add(customer)
-        db.flush()
+    customer = add_customer(db, "", customer_email)
 
     message = EmailMessage(
         customer_id=customer.id,
@@ -87,12 +82,12 @@ def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailM
         body: str,
         sent_at: str,
         parent_message_provider_id: str | None
+        customer_name: str
     }
     """
     ingested_messages = []
     
     customer_cache = {}
-    # thread_cache = {}
 
     for email_data in emails:
         provider_message_id = email_data["provider_message_id"]
@@ -120,11 +115,7 @@ def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailM
         if customer_email in customer_cache:
             customer_id = customer_cache[customer_email]
         else:
-            customer = db.query(Customer).filter_by(email=customer_email).first()
-            if not customer:
-                customer = Customer(email=customer_email)
-                db.add(customer)
-                db.flush()
+            customer = add_customer(db, email_data["customer_name"], customer_email)
             customer_id = customer.id
             customer_cache[customer_email] = customer_id
 

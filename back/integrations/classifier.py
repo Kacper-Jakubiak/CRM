@@ -11,7 +11,8 @@ class EmailClassifier:
 
         stripped_body_text = strip_body(process_result["body"])
 
-        AI_topics_result = AI_topics(subject=process_result["subject"], body=stripped_body_text, sender=process_result["customer_email"])
+        # AI_topics_result = AI_topics(subject=process_result["subject"], body=stripped_body_text, sender=process_result["customer_email"])
+        # print(AI_topics_result)
 
         if '?' in stripped_body_text:
            needs_response = True

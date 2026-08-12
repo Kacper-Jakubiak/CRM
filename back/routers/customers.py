@@ -14,7 +14,14 @@ router = APIRouter(
 @router.get("", response_model=list[CustomerReply])
 def get_customers(db: Session = Depends(get_db)):
     customers = customer_service.get_customers(db)
-    return [CustomerReply(customer_id=customer.id, customer_email=customer.email) for customer in customers]
+    return [
+        CustomerReply(
+            customer_id=customer.id,
+            customer_email=customer.email,
+            customer_note=customer.note,
+            company_id=customer.company_id
+        )
+        for customer in customers]
 
 
 @router.get("/{email_address}/entries", response_model=list[CourseEntryReply])
@@ -36,3 +43,18 @@ def get_customer_messages(email_address: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
 
     return email_messages
+
+
+@router.patch("/{email_address}/note", response_model=CustomerReply)
+def patch_customer_note(email_address: str, note_text: str, db: Session = Depends(get_db)):
+    customer = customer_service.add_customer_note(db, email_address, note_text)
+
+    if customer is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
+    
+    return CustomerReply(
+            customer_id=customer.id,
+            customer_email=customer.email,
+            customer_note=customer.note,
+            company_id=customer.company_id
+        )

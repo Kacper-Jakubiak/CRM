@@ -1,4 +1,5 @@
 from email.policy import default
+from email.utils import parseaddr
 import email
 
 def process_email(msg_data) -> tuple[str, dict[str, str], list[str]]:
@@ -18,7 +19,9 @@ def process_email(msg_data) -> tuple[str, dict[str, str], list[str]]:
     from_header = raw_msg.get("From")
     if not from_header or not hasattr(from_header, "addresses") or not from_header.addresses:
         return "None from_header", {}, []
-    customer_email = from_header.addresses[0].addr_spec
+    first_address = from_header.addresses[0]
+    customer_email = first_address.addr_spec
+    customer_name = first_address.display_name
 
     to_header = raw_msg.get("To")
     if not to_header or not hasattr(to_header, "addresses") or not to_header.addresses:
@@ -45,8 +48,10 @@ def process_email(msg_data) -> tuple[str, dict[str, str], list[str]]:
         "sent_to": sent_to,
         "subject": subject,
         "body": body,
-        "sent_at": sent_at
+        "sent_at": sent_at,
+        "customer_name": customer_name
     }, references
+
 
 def extract_message_id(msg_data) -> str:
     """
@@ -65,3 +70,10 @@ def extract_message_id(msg_data) -> str:
     provider_message_id = str(raw_msg.get("Message-ID", "")).strip("<> ")
     
     return provider_message_id
+
+
+def extract_domain(email_address: str) -> str:
+    name, clean_email = parseaddr(email_address)
+    domain = clean_email.split("@")[-1]
+
+    return domain

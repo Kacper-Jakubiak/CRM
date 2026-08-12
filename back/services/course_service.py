@@ -6,6 +6,7 @@ from db import Course, CourseEntry, Customer, EmailMessage
 from integrations.course_parser import find_courses
 from schemas import CourseEntryReply, EmailMessageReply
 from util.schema_translations import to_entry_reply, to_email_message_reply
+from customer_service import add_customer
 
 
 def add_course(db: Session, course_name: str) -> Course | None:
@@ -32,11 +33,7 @@ def import_courses(db: Session) -> list[Course]:
     added = []
 
     for course_name in courses:
-        exists = (
-            db.query(Course)
-            .filter_by(name=course_name)
-            .first()
-        )
+        exists = (db.query(Course).filter_by(name=course_name).first())
 
         if exists:
             continue
@@ -71,25 +68,12 @@ def get_entries(db: Session) -> list[CourseEntryReply]:
 
 
 def add_course_entry(db: Session, customer_email: str, course_name: str, course_date: str, sent_at: str) -> CourseEntryReply | None:
-    course = (
-        db.query(Course)
-        .filter_by(name=course_name)
-        .first()
-    )
+    course = (db.query(Course).filter_by(name=course_name).first())
 
     if not course:
         return None
 
-    customer = (
-        db.query(Customer)
-        .filter_by(email=customer_email)
-        .first()
-    )
-
-    if not customer:
-        customer = Customer(email=customer_email)
-        db.add(customer)
-        db.flush()
+    customer = add_customer(db, "", customer_email)
 
     course_entry = CourseEntry(
         customer_id=customer.id,
@@ -112,32 +96,20 @@ def add_course_entries_batch(db: Session, entries: list[dict[str, str]]) -> list
         "customer_email": "...",
         "course_name": "...",
         "course_date": "...",
-        "sent_at": "..."
+        "sent_at": "...",
+        "customer_name: "..."
     }
     """
 
     added = []
 
     for item in entries:
-        course = (
-            db.query(Course)
-            .filter_by(name=item["course_name"])
-            .first()
-        )
+        course = (db.query(Course).filter_by(name=item["course_name"]).first())
 
         if not course:
             continue
 
-        customer = (
-            db.query(Customer)
-            .filter_by(email=item["customer_email"])
-            .first()
-        )
-
-        if not customer:
-            customer = Customer(email=item["customer_email"])
-            db.add(customer)
-            db.flush()
+        customer = add_customer(db, item["customer_name"], item["customer_email"])
 
         course_entry = CourseEntry(
             customer_id=customer.id,

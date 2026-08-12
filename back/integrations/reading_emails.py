@@ -1,5 +1,5 @@
 from datetime import date
-from integrations.email_parser import *
+from util.email_util import process_email, extract_message_id
 from integrations.classifier import EmailClassifier, extract_course_details
 from dotenv import load_dotenv
 import imaplib
@@ -104,7 +104,7 @@ def process_single_email(mail, e_id, email_classifier):
         course_details = extract_course_details(processed_email["body"])
         email_payload = None
         print(f"Extracted course details: {course_details}")
-        course_payload = course_details | {"sent_at": processed_email["sent_at"]} if course_details else None
+        course_payload = course_details | {"sent_at": processed_email["sent_at"], "customer_name": processed_email["customer_name"]} if course_details else None
     else:
         classifier_email_data = email_classifier.classify_category(processed_email)
         email_payload = processed_email | classifier_email_data | {

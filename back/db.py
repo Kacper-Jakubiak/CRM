@@ -12,11 +12,21 @@ SessionLocal = sessionmaker(bind=engine)
 class Base(DeclarativeBase):
     pass
 
+class Company(Base):
+    __tablename__ = "companies"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # name: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
+    domain: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
+
 class Customer(Base):
     __tablename__ = "customers"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
     email: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    note: Mapped[str] = mapped_column(nullable=False, default="")
 
 class Course(Base):
     __tablename__ = "courses"

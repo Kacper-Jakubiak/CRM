@@ -583,10 +583,7 @@ function App() {
   return (
     <div className={`app-shell theme-${theme}`}>
       <header className="topbar">
-        <div>
-          <p className="eyebrow">CRM workspace</p>
-          <h1>Email Insights</h1>
-        </div>
+
 
         <div className="topbar-actions">
           <button className="theme-toggle" onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} type="button">

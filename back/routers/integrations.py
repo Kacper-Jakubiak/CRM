@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from services import integration_service
 from dependencies import get_db
 from sqlalchemy.orm import Session
-from schemas import PullEmailsReply, EmailMessageReply, CourseEntryReply
+from schemas import PullEmailsReply
 
 router = APIRouter(prefix="/api/integrations")
 

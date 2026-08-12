@@ -17,7 +17,8 @@ def send_email(
     recipient_email: str,
     subject: str,
     body: str,
-    reply_message_id: Optional[str] = None
+    reply_message_id: str | None,
+    add_html: bool
 ) -> str:
     """Sends a plain text email using SMTP with SSL, supporting optional reply threading."""
     msg = MIMEMultipart("alternative")
@@ -29,6 +30,9 @@ def send_email(
         msg["In-Reply-To"] = reply_message_id
         msg["References"] = reply_message_id
 
+    if add_html:
+        pass
+        #TODO
     msg.attach(MIMEText(body, "plain"))
 
     # print(msg.as_string())

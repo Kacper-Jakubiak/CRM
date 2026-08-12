@@ -1,5 +1,4 @@
 from playwright.sync_api import sync_playwright
-import requests
 
 def find_courses() -> list[str]:
   with sync_playwright() as p:
@@ -16,10 +15,3 @@ def find_courses() -> list[str]:
     browser.close()
 
     return [" ".join(course_name.split()) for course_name in course_names]
-
-
-if __name__ == "__main__":
-   ADD_COURSE_API_URL = "http://127.0.0.1:8000/api/courses"
-   for course_name in find_courses():
-      response = requests.post(ADD_COURSE_API_URL, params={"course_name": course_name})
-      print(f"Status: {response.status_code} | Response: {response.json()}")
