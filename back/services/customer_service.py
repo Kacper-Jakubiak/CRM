@@ -18,13 +18,12 @@ def add_customer(db: Session, name: str, email_address: str) -> Customer:
     if not company:
         company = Company(domain=domain)
         db.add(company)
-        db.refresh(company)
-    
+        db.flush()
 
     customer = Customer(name=name, email=email_address, company_id=company.id)
     db.add(customer)
-    db.flush()
     db.commit()
+    db.refresh(customer)
 
     return customer
 

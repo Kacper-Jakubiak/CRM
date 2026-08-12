@@ -6,7 +6,7 @@ from db import Course, CourseEntry, Customer, EmailMessage
 from integrations.course_parser import find_courses
 from schemas import CourseEntryReply, EmailMessageReply
 from util.schema_translations import to_entry_reply, to_email_message_reply
-from customer_service import add_customer
+from services.customer_service import add_customer
 
 
 def add_course(db: Session, course_name: str) -> Course | None:
@@ -119,7 +119,6 @@ def add_course_entries_batch(db: Session, entries: list[dict[str, str]]) -> list
         )
 
         db.add(course_entry)
-        db.flush()
 
         added.append(course_entry)
 

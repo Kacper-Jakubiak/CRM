@@ -207,6 +207,80 @@ button {
   overflow-wrap: anywhere;
 }
 
+/* Plain list item without box outline (used for compact list appearance) */
+.list-item-plain {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.list-item-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.list-item-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+  display: inline-block;
+  max-width: 140px;
+}
+
+.list-item-note {
+  font-size: 12px;
+  color: #666;
+  max-width: 80px; /* show only a few characters */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Note row styles in middle column */
+.note-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.note-flex {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-display {
+  height: 36px;
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  overflow: auto;
+  white-space: normal; /* allow wrapping to show full note */
+  word-wrap: break-word;
+}
+
+.note-input {
+  height: 36px;
+  padding: 6px 8px;
+  font-size: 13px;
+  box-sizing: border-box;
+  width: 280px;
+}
+
+.note-save-button {
+  height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
 .all-button {
   font-weight: 700;
   background: var(--accent-soft);

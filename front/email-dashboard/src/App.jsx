@@ -277,6 +277,9 @@ function App() {
   const [sendingReply, setSendingReply] = useState(false);
   const [movingEmail, setMovingEmail] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
+  const [customerNote, setCustomerNote] = useState('');
+  const [savingCustomerNote, setSavingCustomerNote] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     setMiddleView('entries');
@@ -373,11 +376,17 @@ function App() {
       const entriesData = await entriesRes.json();
       const messagesData = await messagesRes.json();
 
+      // Prefer the canonical customer object from `customers` state if available
+      const foundCustomer = customers.find((c) => (c.customer_email || c.email) === email);
+      const customerObj = foundCustomer || messagesData.customer || entriesData.customer || { email };
+
       setCustomerHistory({
-        customer: messagesData.customer || entriesData.customer || { email },
+        customer: customerObj,
         messages: messagesData,
         course_entries: entriesData,
       });
+      // initialize editable note state from consistent fields
+      setCustomerNote((customerObj.customer_note || customerObj.note) || '');
     } catch (err) {
       console.error('Error fetching customer history:', err);
     } finally {
@@ -578,7 +587,65 @@ function App() {
     }
   };
 
-  const listItems = view === 'courses' ? courses : customers;
+  const handleSaveCustomerNote = async () => {
+    if (!selectedCustomer) return;
+    setSavingCustomerNote(true);
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/customers/${encodeURIComponent(selectedCustomer)}/note?note_text=${encodeURIComponent(customerNote)}`,
+        { method: 'PATCH' }
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to save note');
+      }
+
+      const updated = await res.json();
+      // update customers list locally (consistent field name)
+      setCustomers((prev) => prev.map((c) => (c.customer_email === updated.customer_email ? { ...c, customer_note: updated.customer_note } : c)));
+      // update customerHistory customer fields consistently and update editable input
+      setCustomerHistory((prev) => ({
+        ...prev,
+        customer: { ...prev.customer, customer_note: updated.customer_note, note: updated.customer_note },
+      }));
+      setCustomerNote(updated.customer_note || '');
+      alert('Customer note saved');
+    } catch (err) {
+      console.error('Error saving customer note:', err);
+      alert('Failed to save customer note');
+    } finally {
+      setSavingCustomerNote(false);
+    }
+  };
+
+  // filtered / sorted lists for search and sort controls
+  const q = searchQuery.trim().toLowerCase();
+
+  const filteredCourses = courses
+    .filter((c) => (q ? c.course_name.toLowerCase().includes(q) : true))
+    .slice();
+  filteredCourses.sort((a, b) => a.course_name.localeCompare(b.course_name));
+
+  const filteredCustomers = customers
+    .filter((c) => {
+      if (!q) return true;
+      const email = (c.customer_email || '').toLowerCase();
+      const note = (c.customer_note || c.note || '').toLowerCase();
+      const company = c.company_id ? String(c.company_id) : '';
+      return email.includes(q) || note.includes(q) || company.includes(q);
+    })
+    .slice();
+  filteredCustomers.sort((a, b) => (a.customer_email || '').localeCompare(b.customer_email || ''));
+
+  const customersByCompany = Object.entries(
+    filteredCustomers.reduce((acc, c) => {
+      const key = c.company_id ?? 'No company';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(c);
+      return acc;
+    }, {})
+  );
 
   return (
     <div className={`app-shell theme-${theme}`}>
@@ -606,6 +673,16 @@ function App() {
             <h2>{view === 'courses' ? 'Courses' : 'Customers'}</h2>
           </div>
 
+          <div className="list-controls">
+            <input
+              type="search"
+              placeholder={view === 'courses' ? 'Search courses...' : 'Search customers...'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+          </div>
+
           <div className="all-button-row">
             <button
               type="button"
@@ -626,31 +703,45 @@ function App() {
             </button>
           </div>
 
-          <div className="list-panel">
-            {listItems.length === 0 ? (
-              <div className="empty-state small">No records available.</div>
-            ) : (
-              listItems.map((item) => {
-                const label = view === 'courses' ? item.course_name : item.customer_email;
-                const isSelected = view === 'courses' ? selectedCourse === item.course_name : selectedCustomer === item.customer_email;
+          
 
-                return (
+          <div className="list-panel">
+            {view === 'courses' ? (
+              filteredCourses.length === 0 ? (
+                <div className="empty-state small">No courses match.</div>
+              ) : (
+                filteredCourses.map((item) => (
                   <button
-                    key={view === 'courses' ? item.course_id : item.customer_id}
-                    className={isSelected ? 'list-item active' : 'list-item'}
-                    onClick={() => {
-                      if (view === 'courses') {
-                        handleCourseClick(item.course_name);
-                      } else {
-                        handleCustomerClick(item.customer_email);
-                      }
-                    }}
+                    key={item.course_id}
+                    className={`${selectedCourse === item.course_name ? 'list-item active' : 'list-item'} list-item-plain`}
+                    onClick={() => handleCourseClick(item.course_name)}
                     type="button"
                   >
-                    {label}
+                    {item.course_name}
                   </button>
-                );
-              })
+                ))
+              )
+            ) : (
+              customersByCompany.length === 0 ? (
+                <div className="empty-state small">No customers match.</div>
+              ) : (
+                customersByCompany.map(([companyId, custs]) => (
+                  <div key={companyId} className="company-group">
+                    <div className="company-header">{companyId === 'No company' ? 'No company' : `Company ${companyId}`}</div>
+                      {custs.map((item) => (
+                        <button
+                          key={item.customer_id}
+                          className={`${selectedCustomer === item.customer_email ? 'list-item active' : 'list-item'} list-item-plain list-item-flex`}
+                          onClick={() => handleCustomerClick(item.customer_email)}
+                          type="button"
+                        >
+                          <span className="list-item-email">{item.customer_email}</span>
+                          <span className="list-item-note">{item.customer_note || item.note || ''}</span>
+                        </button>
+                      ))}
+                  </div>
+                ))
+              )
             )}
           </div>
         </aside>
@@ -735,8 +826,42 @@ function App() {
           {!loading && selectedCustomer && (
             <div className="content-inner">
               <div className="panel-header">
-                <h2>Customer history: {selectedCustomer}</h2>
-              </div>
+                    <h2>Customer history: {customerHistory.customer?.email || selectedCustomer}</h2>
+                  </div>
+
+                  {customerHistory.customer && (
+                    <div className="customer-meta">
+                      {customerHistory.customer.company_id && (
+                        <div className="customer-company">Company ID: {customerHistory.customer.company_id}</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Note display + editor in middle column, left-aligned, same height */}
+                  {customerHistory.customer && selectedCustomer && selectedCustomer !== 'All' && (
+                    <div className="note-row">
+                      <div className="note-flex">
+                        <div className="note-display">{customerHistory.customer.note || ''}</div>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={customerNote}
+                        onChange={(e) => setCustomerNote(e.target.value)}
+                        placeholder="Edit note"
+                        className="note-input"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={handleSaveCustomerNote}
+                        disabled={savingCustomerNote}
+                        className="note-save-button"
+                      >
+                        {savingCustomerNote ? 'Saving...' : 'Save'}
+                      </button>
+                    </div>
+                  )}
 
               <div className="detail-toggle-row">
                 <button
@@ -821,7 +946,7 @@ function App() {
           ) : (
             <div className="email-detail">
               <div className="email-detail__meta">
-                <span className="badge">{selectedEmail.needs_response ? 'Needs response' : 'Resolved'}</span>
+                <span className={`badge ${selectedEmail.needs_response ? 'badge-needs-response' : 'badge-resolved'}`}>{selectedEmail.needs_response ? 'Needs response' : 'Resolved'}</span>
                 <span className="email-detail__timestamp">{selectedEmail.sent_at ? new Date(selectedEmail.sent_at).toLocaleString() : ''}</span>
               </div>
 

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from db import EmailMessage, Thread
 from schemas import EmailMessageReply
 from util.schema_translations import to_email_message_reply
-from customer_service import add_customer
+from services.customer_service import add_customer
 
 
 def get_emails(db: Session) -> list[EmailMessageReply]:
