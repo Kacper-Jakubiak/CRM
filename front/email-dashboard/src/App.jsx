@@ -272,6 +272,7 @@ function App() {
   const [middleView, setMiddleView] = useState('entries');
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [replyText, setReplyText] = useState('');
+  const [isHtmlReply, setIsHtmlReply] = useState(false);
   const [moveThreadTarget, setMoveThreadTarget] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
@@ -281,8 +282,9 @@ function App() {
   const [savingCustomerNote, setSavingCustomerNote] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // We intentionally DO NOT reset `middleView` here so that the user's selected 
+  // view mode perfectly persists as they browse different records
   useEffect(() => {
-    setMiddleView('entries');
     setReplyText('');
     setMoveThreadTarget('');
     setIsReplying(false);
@@ -337,7 +339,6 @@ function App() {
     setSelectedCustomer(null);
     setSelectedEmail(null);
     setMessageFilter('all');
-    setMiddleView('entries');
     setLoading(true);
 
     try {
@@ -399,7 +400,6 @@ function App() {
     setSelectedCourse(null);
     setSelectedEmail(null);
     setMessageFilter('all');
-    setMiddleView('emails');
     setLoading(true);
 
     try {
@@ -438,7 +438,7 @@ function App() {
   const handleSyncData = async () => {
     setIsSyncing(true);
     try {
-      const coursesRes = await fetch(`${API_BASE_URL}/api/courses/import`, {
+      const coursesRes = await fetch(`${API_BASE_URL}/api/integrations/courses/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -529,6 +529,7 @@ function App() {
           subject: `Re: ${selectedEmail.subject || 'No Subject'}`,
           body: replyText,
           reply_message_id: selectedEmail.provider_message_id,
+          add_html: isHtmlReply
         }),
       });
 
@@ -732,15 +733,23 @@ function App() {
                           onClick={() => handleCustomerClick(item.customer_email)}
                           type="button"
                         >
-                          <div className="list-item-customer-details" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                          <div className="list-item-customer-details">
                             {item.customer_name && (
                               <span className="list-item-name" style={{ fontWeight: 'bold' }}>
                                 {item.customer_name}
                               </span>
                             )}
-                            <span className="list-item-email">{item.customer_email}</span>
+                            <span className="list-item-email" title={item.customer_email}>
+                              {item.customer_email}
+                            </span>
                           </div>
-                          <span className="list-item-note">{item.customer_note || item.note || ''}</span>
+                          
+                          {/* Only render the note line if a note actually exists */}
+                          {(item.customer_note || item.note) && (
+                            <span className="list-item-note" title={item.customer_note || item.note}>
+                              {item.customer_note || item.note}
+                            </span>
+                          )}
                         </button>
                       ))}
                   </div>
@@ -847,16 +856,14 @@ function App() {
                 </div>
               )}
 
-              {/* Editable note input spanning the full column width */}
+              {/* Editable note input with margin bounds applied from App.css */}
               {customerHistory.customer && selectedCustomer && selectedCustomer !== 'All' && (
-                <div className="note-row" style={{ width: '100%', display: 'flex', gap: '8px' }}>
-                  <input
-                    type="text"
+                <div className="note-row">
+                  <textarea
                     value={customerNote}
                     onChange={(e) => setCustomerNote(e.target.value)}
                     placeholder="Edit note..."
                     className="note-input"
-                    style={{ flex: 1, width: '100%' }}
                   />
 
                   <button
@@ -998,6 +1005,14 @@ function App() {
                     className="reply-textarea"
                   />
                   <div className="reply-actions">
+                    <label className="html-toggle-label">
+                      <input 
+                        type="checkbox" 
+                        checked={isHtmlReply} 
+                        onChange={(e) => setIsHtmlReply(e.target.checked)} 
+                      />
+                      Send as HTML
+                    </label>
                     <button type="button" className="btn-send" onClick={handleSendReply} disabled={sendingReply}>
                       {sendingReply ? 'Sending...' : 'Send'}
                     </button>

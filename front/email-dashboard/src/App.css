@@ -216,37 +216,46 @@ button {
   text-align: left;
 }
 
-.list-item-flex {
+.list-item.list-item-flex {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.list-item-customer-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
 }
 
 .list-item-email {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-right: 8px;
-  display: inline-block;
-  max-width: 140px;
+  width: 100%;
 }
 
 .list-item-note {
   font-size: 12px;
-  color: #666;
-  max-width: 80px; /* show only a few characters */
+  color: var(--muted);
+  width: 100%;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 
-/* Note row styles in middle column */
 .note-row {
   display: flex;
   gap: 8px;
-  align-items: center;
-  margin-top: 8px;
-  margin-bottom: 8px;
+  align-items: stretch;
+  margin: 8px 14px;
 }
 
 .note-flex {
@@ -263,33 +272,40 @@ button {
   align-items: center;
   text-align: left;
   overflow: auto;
-  white-space: normal; /* allow wrapping to show full note */
+  white-space: normal;
   word-wrap: break-word;
 }
 
 .note-input {
-  height: 36px;
+  flex: 1;
+  min-height: 60px;
   padding: 6px 8px;
   font-size: 13px;
   box-sizing: border-box;
-  width: 280px;
+  font-family: inherit;
+  resize: vertical;
+  overflow-y: auto;
 }
 
 .note-save-button {
-  height: 36px;
   padding: 6px 12px;
   font-size: 13px;
+  height: auto;
 }
 
 .all-button {
   font-weight: 700;
   background: var(--accent-soft);
   border-left-color: var(--accent);
-  margin: 0 6px 2px;
+  margin: 0 6px 8px;
   padding: 0.6rem 0.9rem;
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  display: block;
+  text-align: center;
+  width: calc(100% - 12px);
+}
+
+.list-controls {
+  margin: 14px 10px;
 }
 
 .list-item.active {
@@ -652,7 +668,7 @@ button {
 
 .btn-send {
   background: #4ade80;
-  border-color: #4ade80;
+  border-color: #062c0d;
   color: #062c0d;
 }
 
@@ -683,8 +699,18 @@ button {
 .reply-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 6px;
   margin-top: 6px;
+}
+
+.html-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  color: var(--muted);
+  margin-right: auto;
 }
 
 .hidden-msg-text {
@@ -733,12 +759,20 @@ button {
   align-items: center;
   padding: 0.3rem 0.55rem;
   border-radius: 999px;
-  background: var(--success-bg);
-  color: var(--success-text);
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.badge-needs-response {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+}
+
+.badge-resolved {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
 }
 
 .email-detail__timestamp {
@@ -802,4 +836,16 @@ button {
     width: 100%;
     justify-content: space-between;
   }
+}
+
+
+.search-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-alt);
+  color: var(--text);
+  font-size: 0.75rem;
+  box-sizing: border-box;
 }

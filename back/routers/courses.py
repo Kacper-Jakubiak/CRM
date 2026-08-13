@@ -25,13 +25,6 @@ def add_course(course_name: str, db: Session = Depends(get_db)):
     return CourseReply(course_id=course.id, course_name=course.name)
 
 
-@router.post("/import", status_code=status.HTTP_201_CREATED, response_model=list[CourseReply])
-def import_courses(db: Session = Depends(get_db)):
-    courses = course_service.import_courses(db)
-    return [CourseReply(course_id=c.id, course_name=c.name) for c in courses]
-
-
-
 @router.get("", response_model=list[CourseReply])
 def get_courses(db: Session = Depends(get_db)):
     courses = course_service.get_courses(db)
