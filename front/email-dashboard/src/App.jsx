@@ -744,7 +744,6 @@ function App() {
                             </span>
                           </div>
                           
-                          {/* Only render the note line if a note actually exists */}
                           {(item.customer_note || item.note) && (
                             <span className="list-item-note" title={item.customer_note || item.note}>
                               {item.customer_note || item.note}
@@ -856,7 +855,6 @@ function App() {
                 </div>
               )}
 
-              {/* Editable note input with margin bounds applied from App.css */}
               {customerHistory.customer && selectedCustomer && selectedCustomer !== 'All' && (
                 <div className="note-row">
                   <textarea

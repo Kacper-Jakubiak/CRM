@@ -207,7 +207,6 @@ button {
   overflow-wrap: anywhere;
 }
 
-/* Plain list item without box outline (used for compact list appearance) */
 .list-item-plain {
   border: none;
   box-shadow: none;
