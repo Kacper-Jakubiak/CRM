@@ -154,7 +154,6 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
       <div 
         className={`thread-header ${collapsed ? 'collapsed' : 'expanded'}`}
         onClick={handleToggleCollapse}
-        style={{ cursor: 'pointer' }}
       >
         <h4 className="thread-title">
           {collapsed ? '▶ ' : '▼ '}Thread #{threadId !== 'Unassigned' ? threadId : 'Unassigned'}
@@ -646,8 +645,6 @@ function App() {
     }, {})
   );
 
-  const dividerStyle = { borderBottom: '1px solid rgba(128, 128, 128, 0.2)' };
-
   return (
     <div className={`app-shell theme-${theme}`}>
       <header className="topbar">
@@ -682,7 +679,7 @@ function App() {
             />
           </div>
 
-          <div className="all-button-row" style={dividerStyle}>
+          <div className="all-button-row divider-bottom">
             <button
               type="button"
               className={
@@ -707,12 +704,11 @@ function App() {
               filteredCourses.length === 0 ? (
                 <div className="empty-state small">No courses match.</div>
               ) : (
-                filteredCourses.map((item, index) => (
+                filteredCourses.map((item) => (
                   <button
                     key={item.course_id}
-                    className={`${selectedCourse === item.course_name ? 'list-item active' : 'list-item'} list-item-plain`}
+                    className={`${selectedCourse === item.course_name ? 'list-item active' : 'list-item'} list-item-plain course-item`}
                     onClick={() => handleCourseClick(item.course_name)}
-                    style={index < filteredCourses.length - 1 ? dividerStyle : undefined}
                     type="button"
                   >
                     {item.course_name}
@@ -723,55 +719,30 @@ function App() {
               customersByCompany.length === 0 ? (
                 <div className="empty-state small">No customers match.</div>
               ) : (
-                customersByCompany.map(([companyName, custs], compIndex) => {
+                customersByCompany.map(([companyName, custs]) => {
                   const isCollapsed = Boolean(collapsedCompanies[companyName]);
 
                   return (
-                    <div
-                      key={companyName}
-                      className="company-group"
-                      style={compIndex < customersByCompany.length - 1 ? dividerStyle : undefined}
-                    >
+                    <div key={companyName} className="company-group">
                       <div 
                         className="company-header"
                         onClick={() => toggleCompanyCollapse(companyName)}
-                        style={{
-                          fontWeight: 700,
-                          fontSize: '0.8rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.06em',
-                          padding: '6px 10px',
-                          backgroundColor: 'rgba(128, 128, 128, 0.15)',
-                          borderRadius: '4px',
-                          marginTop: compIndex > 0 ? '10px' : '4px',
-                          marginBottom: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          cursor: 'pointer',
-                          userSelect: 'none',
-                        }}
                       >
-                        <span style={{ fontSize: '0.75rem' }}>{isCollapsed ? '▶' : '▼'}</span>
-                        <span style={{ fontSize: '0.9rem' }}></span>
-                        <span style={{ flexGrow: 1 }}>{companyName}</span>
-                        <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>({custs.length})</span>
+                        <span className="company-header-arrow">{isCollapsed ? '▶' : '▼'}</span>
+                        <span className="company-header-title">{companyName}</span>
+                        <span className="company-header-count">({custs.length})</span>
                       </div>
 
-                      {!isCollapsed && custs.map((item, custIndex) => (
+                      {!isCollapsed && custs.map((item) => (
                         <button
                           key={item.customer_id}
-                          className={`${selectedCustomer === item.customer_email ? 'list-item active' : 'list-item'} list-item-plain list-item-flex`}
+                          className={`${selectedCustomer === item.customer_email ? 'list-item active' : 'list-item'} list-item-plain list-item-flex customer-item-nested`}
                           onClick={() => handleCustomerClick(item.customer_email)}
-                          style={{
-                            paddingLeft: '16px',
-                            ...(custIndex < custs.length - 1 ? { borderBottom: '1px solid rgba(128, 128, 128, 0.1)' } : {})
-                          }}
                           type="button"
                         >
                           <div className="list-item-customer-details">
                             {item.customer_name && (
-                              <span className="list-item-name" style={{ fontWeight: 'bold' }}>
+                              <span className="list-item-name">
                                 {item.customer_name}
                               </span>
                             )}

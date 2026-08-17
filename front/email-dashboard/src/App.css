@@ -230,6 +230,7 @@ button {
   align-items: flex-start;
   width: 100%;
   min-width: 0;
+  line-height: 1.3;
 }
 
 .list-item-email {
@@ -479,13 +480,11 @@ button {
   align-items: center;
   gap: 6px;
   flex-wrap: nowrap;
-  padding: 6px 8px;
+  padding: 0px 8px;
 }
 
 .thread-header.expanded {
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 3px;
-  margin-bottom: 4px;
+  padding-bottom: 2px;
 }
 
 .btn-toggle-status,
@@ -507,7 +506,7 @@ button {
   border: 1px solid var(--line);
   color: var(--text);
   font-size: 0.55rem;
-  padding: 2px 4px;
+  padding: 0px 4px;
   background: var(--panel);
 }
 
@@ -540,7 +539,7 @@ button {
 
 .input-target-id {
   width: 55px;
-  padding: 2px 4px;
+  padding: 0px 4px;
   font-size: 0.55rem;
   border-radius: 4px;
   border: 1px solid var(--line);
@@ -574,6 +573,7 @@ button {
   padding: 6px 8px;
   list-style: none;
   cursor: pointer;
+  line-height: 1.4;
 }
 
 .email-header {
@@ -885,4 +885,62 @@ button {
   color: var(--text);
   font-size: 0.75rem;
   box-sizing: border-box;
+}
+
+.divider-bottom {
+  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.course-item:not(:last-child) {
+  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.company-group:not(:last-child) {
+  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.company-header {
+  font-weight: 700;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  background-color: rgba(128, 128, 128, 0.15);
+  border-radius: 4px;
+  /* margin-top: 2px; */
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.company-group:first-child .company-header {
+  margin-top: 4px;
+}
+
+.company-header-arrow {
+  font-size: 0.6rem;
+}
+
+.company-header-title {
+  flex-grow: 1;
+}
+
+.company-header-count {
+  font-size: 0.6rem;
+  opacity: 0.7;
+}
+
+.customer-item-nested {
+  padding-left: 10px;
+}
+
+.customer-item-nested:not(:last-child) {
+  border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+}
+
+.list-item-name {
+  font-weight: bold;
 }

@@ -3,7 +3,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
 from dotenv import load_dotenv
-from jinja2 import Template  # <-- Added Jinja2 import
+from jinja2 import Template
 
 load_dotenv()
 
@@ -12,7 +12,6 @@ SMTP_PORT = 465
 SENDER_EMAIL: str = os.getenv("CDSI_EMAIL_USER", "")
 SENDER_PASSWORD: str = os.getenv("CDSI_EMAIL_PASSWORD", "")
 
-# Define a clean, basic HTML template using Jinja2 syntax
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -28,7 +27,6 @@ HTML_TEMPLATE = """
 <body>
     <div class="container">
         <div class="content">
-            <!-- The replace filter converts plain text newlines to HTML line breaks -->
             {{ message_body | replace('\n', '<br>') }}
         </div>
         <div class="footer">
@@ -56,16 +54,12 @@ def send_email(
         msg["In-Reply-To"] = reply_message_id
         msg["References"] = reply_message_id
 
-    # IMPORTANT: Attach the plain text part FIRST for 'alternative' payloads.
-    # Email clients will render the LAST part they understand (HTML).
     msg.attach(MIMEText(body, "plain"))
 
     if add_html:
-        # Render the template with the provided body text
         template = Template(HTML_TEMPLATE)
         html_content = template.render(message_body=body)
         
-        # Attach the rendered HTML part SECOND
         msg.attach(MIMEText(html_content, "html"))
 
     # print(msg.as_string())
