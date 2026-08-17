@@ -151,35 +151,34 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
 
   return (
     <div className="thread-card">
-      <div className={`thread-header ${collapsed ? 'collapsed' : 'expanded'}`}>
-        <div className="thread-title-group">
-          <button onClick={handleToggleCollapse} className="btn-collapse" type="button">
-            {collapsed ? '▶ Expand' : '▼ Collapse'}
-          </button>
-          <h4 className="thread-title">
-            Thread #{threadId !== 'Unassigned' ? threadId : 'Unassigned'}
-            <span className="thread-count"> ({threadMessages.length} {threadMessages.length === 1 ? 'msg' : 'msgs'})</span>
-          </h4>
+      <div 
+        className={`thread-header ${collapsed ? 'collapsed' : 'expanded'}`}
+        onClick={handleToggleCollapse}
+        style={{ cursor: 'pointer' }}
+      >
+        <h4 className="thread-title">
+          {collapsed ? '▶ ' : '▼ '}Thread #{threadId !== 'Unassigned' ? threadId : 'Unassigned'}
+          <span className="thread-count"> ({threadMessages.length} {threadMessages.length === 1 ? 'msg' : 'msgs'})</span>
+        </h4>
 
+        <div className="thread-actions-group" onClick={(e) => e.stopPropagation()}>
           {threadId !== 'Unassigned' && (
             <button onClick={fetchFullThreadMessages} disabled={loadingThread} className="btn-fetch-thread" title="Fetch all messages in this thread" type="button">
-              {loadingThread ? 'Loading...' : hasFetchedFullThread ? '✓ Synced' : '↻ Fetch Full Thread'}
+              {loadingThread ? 'Loading...' : hasFetchedFullThread ? '✓ Synced' : '↻ Fetch'}
             </button>
           )}
-        </div>
 
-        <div className="thread-merge-group">
           {threadId !== 'Unassigned' ? (
             <>
               <input
                 type="number"
-                placeholder="Merge to ID"
+                placeholder="Merge ID"
                 value={targetThreadId}
                 onChange={(e) => setTargetThreadId(e.target.value)}
                 className="input-target-id"
               />
               <button onClick={handleMergeThreads} disabled={merging} className="btn-merge" type="button">
-                {merging ? 'Merging...' : 'Merge Thread'}
+                {merging ? 'Merging...' : 'Merge'}
               </button>
             </>
           ) : (
@@ -200,9 +199,6 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
           />
         ))}
       </ul>
-      {collapsed && threadMessages.length > 1 && (
-        <p className="hidden-msg-text">+ {threadMessages.length - 1} older message(s) hidden.</p>
-      )}
     </div>
   );
 }
@@ -281,14 +277,20 @@ function App() {
   const [customerNote, setCustomerNote] = useState('');
   const [savingCustomerNote, setSavingCustomerNote] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [collapsedCompanies, setCollapsedCompanies] = useState({});
 
-  // We intentionally DO NOT reset `middleView` here so that the user's selected 
-  // view mode perfectly persists as they browse different records
   useEffect(() => {
     setReplyText('');
     setMoveThreadTarget('');
     setIsReplying(false);
   }, [selectedCourse, selectedCustomer]);
+
+  const toggleCompanyCollapse = (companyName) => {
+    setCollapsedCompanies((prev) => ({
+      ...prev,
+      [companyName]: !prev[companyName],
+    }));
+  };
 
   const fetchCoursesAndCustomers = () => {
     fetch(`${API_BASE_URL}/api/courses`)
@@ -377,7 +379,6 @@ function App() {
       const entriesData = await entriesRes.json();
       const messagesData = await messagesRes.json();
 
-      // Prefer the canonical customer object from `customers` state if available
       const foundCustomer = customers.find((c) => (c.customer_email || c.email) === email);
       const customerObj = foundCustomer || messagesData.customer || entriesData.customer || { email };
 
@@ -386,7 +387,6 @@ function App() {
         messages: messagesData,
         course_entries: entriesData,
       });
-      // initialize editable note state from consistent fields
       setCustomerNote((customerObj.customer_note || customerObj.note) || '');
     } catch (err) {
       console.error('Error fetching customer history:', err);
@@ -603,9 +603,7 @@ function App() {
       }
 
       const updated = await res.json();
-      // update customers list locally (consistent field name)
       setCustomers((prev) => prev.map((c) => (c.customer_email === updated.customer_email ? { ...c, customer_note: updated.customer_note } : c)));
-      // update customerHistory customer fields consistently and update editable input
       setCustomerHistory((prev) => ({
         ...prev,
         customer: { ...prev.customer, customer_note: updated.customer_note, note: updated.customer_note },
@@ -620,7 +618,6 @@ function App() {
     }
   };
 
-  // filtered / sorted lists for search and sort controls
   const q = searchQuery.trim().toLowerCase();
 
   const filteredCourses = courses
@@ -648,6 +645,8 @@ function App() {
       return acc;
     }, {})
   );
+
+  const dividerStyle = { borderBottom: '1px solid rgba(128, 128, 128, 0.2)' };
 
   return (
     <div className={`app-shell theme-${theme}`}>
@@ -683,7 +682,7 @@ function App() {
             />
           </div>
 
-          <div className="all-button-row">
+          <div className="all-button-row" style={dividerStyle}>
             <button
               type="button"
               className={
@@ -708,11 +707,12 @@ function App() {
               filteredCourses.length === 0 ? (
                 <div className="empty-state small">No courses match.</div>
               ) : (
-                filteredCourses.map((item) => (
+                filteredCourses.map((item, index) => (
                   <button
                     key={item.course_id}
                     className={`${selectedCourse === item.course_name ? 'list-item active' : 'list-item'} list-item-plain`}
                     onClick={() => handleCourseClick(item.course_name)}
+                    style={index < filteredCourses.length - 1 ? dividerStyle : undefined}
                     type="button"
                   >
                     {item.course_name}
@@ -723,14 +723,50 @@ function App() {
               customersByCompany.length === 0 ? (
                 <div className="empty-state small">No customers match.</div>
               ) : (
-                customersByCompany.map(([companyName, custs]) => (
-                  <div key={companyName} className="company-group">
-                    <div className="company-header">{companyName}</div>
-                      {custs.map((item) => (
+                customersByCompany.map(([companyName, custs], compIndex) => {
+                  const isCollapsed = Boolean(collapsedCompanies[companyName]);
+
+                  return (
+                    <div
+                      key={companyName}
+                      className="company-group"
+                      style={compIndex < customersByCompany.length - 1 ? dividerStyle : undefined}
+                    >
+                      <div 
+                        className="company-header"
+                        onClick={() => toggleCompanyCollapse(companyName)}
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
+                          padding: '6px 10px',
+                          backgroundColor: 'rgba(128, 128, 128, 0.15)',
+                          borderRadius: '4px',
+                          marginTop: compIndex > 0 ? '10px' : '4px',
+                          marginBottom: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <span style={{ fontSize: '0.75rem' }}>{isCollapsed ? '▶' : '▼'}</span>
+                        <span style={{ fontSize: '0.9rem' }}></span>
+                        <span style={{ flexGrow: 1 }}>{companyName}</span>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>({custs.length})</span>
+                      </div>
+
+                      {!isCollapsed && custs.map((item, custIndex) => (
                         <button
                           key={item.customer_id}
                           className={`${selectedCustomer === item.customer_email ? 'list-item active' : 'list-item'} list-item-plain list-item-flex`}
                           onClick={() => handleCustomerClick(item.customer_email)}
+                          style={{
+                            paddingLeft: '16px',
+                            ...(custIndex < custs.length - 1 ? { borderBottom: '1px solid rgba(128, 128, 128, 0.1)' } : {})
+                          }}
                           type="button"
                         >
                           <div className="list-item-customer-details">
@@ -751,8 +787,9 @@ function App() {
                           )}
                         </button>
                       ))}
-                  </div>
-                ))
+                    </div>
+                  );
+                })
               )
             )}
           </div>

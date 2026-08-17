@@ -1,15 +1,15 @@
 :root {
-  --bg: #f3f4f6;
-  --panel: #ffffff;
-  --panel-alt: #f7f8fa;
-  --line: #d9dee5;
-  --text: #20252d;
-  --muted: #6b7280;
-  --accent: #4b5563;
-  --accent-soft: #eef1f4;
-  --success-bg: #e3f7ea;
-  --success-text: #1d6b3c;
-  --shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --bg: #ffffff;
+  --panel: #f8fafc;
+  --panel-alt: #e2e8f0;
+  --line: #64748b;
+  --text: #020617;
+  --muted: #334155;
+  --accent: #0f172a;
+  --accent-soft: #cbd5e1;
+  --success-bg: #dcfce7;
+  --success-text: #14532d;
+  --shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
 }
 
 * {
@@ -41,17 +41,17 @@ button {
 }
 
 .app-shell.theme-dark {
-  --bg: #111827;
-  --panel: #1a1f2a;
-  --panel-alt: #141a24;
-  --line: #2d3748;
-  --text: #edf2f7;
-  --muted: #9aa5b1;
-  --accent: #c9d1d9;
-  --accent-soft: rgba(201, 209, 217, 0.12);
-  --success-bg: rgba(34, 197, 94, 0.12);
-  --success-text: #d6f7df;
-  --shadow: 0 1px 3px rgba(2, 6, 23, 0.25);
+  --bg: #030712;
+  --panel: #111827;
+  --panel-alt: #1f2937;
+  --line: #4b5563;
+  --text: #ffffff;
+  --muted: #d1d5db;
+  --accent: #f9fafb;
+  --accent-soft: rgba(249, 250, 251, 0.18);
+  --success-bg: rgba(34, 197, 94, 0.25);
+  --success-text: #86efac;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .topbar {
@@ -98,7 +98,7 @@ button {
 .sync-button {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--bg);
 }
 
 .sync-button:disabled {
@@ -174,7 +174,7 @@ button {
 .segment.active {
   background: var(--accent-soft);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--text);
 }
 
 .list-panel {
@@ -284,12 +284,20 @@ button {
   font-family: inherit;
   resize: vertical;
   overflow-y: auto;
+  background: var(--panel-alt);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 
 .note-save-button {
   padding: 6px 12px;
   font-size: 13px;
   height: auto;
+  background: var(--accent);
+  color: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 
 .all-button {
@@ -417,6 +425,7 @@ button {
 .detail-toggle.active {
   background: var(--accent-soft);
   border-color: var(--accent);
+  color: var(--text);
 }
 
 .filter-header {
@@ -460,7 +469,8 @@ button {
   border-radius: 8px;
   background: var(--panel-alt);
   margin-bottom: 8px;
-  padding: 8px 8px 6px;
+  padding: 0;
+  overflow: hidden;
 }
 
 .thread-header {
@@ -469,25 +479,15 @@ button {
   align-items: center;
   gap: 6px;
   flex-wrap: nowrap;
+  padding: 6px 8px;
 }
 
 .thread-header.expanded {
   border-bottom: 1px solid var(--line);
-  padding-bottom: 5px;
-  margin-bottom: 7px;
+  padding-bottom: 3px;
+  margin-bottom: 4px;
 }
 
-.thread-title-group {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  flex: 1;
-}
-
-.btn-collapse,
-.btn-fetch-thread,
-.btn-merge,
 .btn-toggle-status,
 .btn-reply,
 .btn-send,
@@ -500,6 +500,17 @@ button {
   padding: 2px 5px;
 }
 
+.btn-collapse,
+.btn-fetch-thread,
+.btn-merge {
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 0.55rem;
+  padding: 2px 4px;
+  background: var(--panel);
+}
+
 .btn-fetch-thread {
   white-space: nowrap;
   font-size: 0.58rem;
@@ -510,6 +521,8 @@ button {
   font-size: 0.72rem;
   color: var(--text);
   white-space: nowrap;
+  flex: 1;
+  text-align: left;
 }
 
 .thread-count {
@@ -517,19 +530,19 @@ button {
   color: var(--muted);
 }
 
-.thread-merge-group {
+.thread-actions-group {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .input-target-id {
-  width: 72px;
+  width: 55px;
   padding: 2px 4px;
-  font-size: 0.58rem;
-  border-radius: 5px;
+  font-size: 0.55rem;
+  border-radius: 4px;
   border: 1px solid var(--line);
   background: var(--panel);
   color: var(--text);
@@ -553,11 +566,12 @@ button {
 }
 
 .email-item {
-  margin-bottom: 6px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
+  margin: 0;
+  border: none;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
   background: var(--panel);
-  padding: 5px 7px;
+  padding: 6px 8px;
   list-style: none;
   cursor: pointer;
 }
@@ -574,6 +588,7 @@ button {
   font-size: 0.7rem;
   word-break: break-word;
   flex: 1;
+  text-align: left;
 }
 
 .email-timestamp {
@@ -606,13 +621,21 @@ button {
 }
 
 .status-needs-response {
-  color: #f87171;
+  color: #dc2626;
   font-weight: bold;
 }
 
+.app-shell.theme-dark .status-needs-response {
+  color: #f87171;
+}
+
 .status-resolved {
-  color: #4ade80;
+  color: #166534;
   font-weight: bold;
+}
+
+.app-shell.theme-dark .status-resolved {
+  color: #4ade80;
 }
 
 .email-body-group {
@@ -666,9 +689,15 @@ button {
 }
 
 .btn-send {
-  background: #4ade80;
-  border-color: #062c0d;
-  color: #062c0d;
+  background: #166534;
+  border-color: #14532d;
+  color: #ffffff;
+}
+
+.app-shell.theme-dark .btn-send {
+  background: #22c55e;
+  border-color: #15803d;
+  color: #022c22;
 }
 
 .btn-cancel {
@@ -765,13 +794,23 @@ button {
 }
 
 .badge-needs-response {
-  background: rgba(248, 113, 113, 0.15);
-  color: #f87171;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.app-shell.theme-dark .badge-needs-response {
+  background: rgba(248, 113, 113, 0.2);
+  color: #fca5a5;
 }
 
 .badge-resolved {
-  background: rgba(74, 222, 128, 0.15);
-  color: #4ade80;
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.app-shell.theme-dark .badge-resolved {
+  background: rgba(74, 222, 128, 0.2);
+  color: #86efac;
 }
 
 .email-detail__timestamp {
@@ -836,7 +875,6 @@ button {
     justify-content: space-between;
   }
 }
-
 
 .search-input {
   width: 100%;
