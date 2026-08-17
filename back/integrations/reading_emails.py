@@ -4,7 +4,7 @@ from integrations.classifier import EmailClassifier, extract_course_details
 from dotenv import load_dotenv
 import imaplib
 import os
-from db import EmailMessage, CourseEntry
+from db import EmailMessage, CourseEntry, AppConfig
 
 load_dotenv()
 
@@ -26,25 +26,27 @@ def build_classifier(db) -> EmailClassifier | None:
     return EmailClassifier(course_names)
 
 
-def get_search_criteria() -> str:
-  """Reads the last pull date from file or defaults to fetching all emails
-
-  if the file is missing or empty.
+def get_search_criteria(db) -> str:
+  """Reads the last pull date from db
   """
-  if os.path.exists(LAST_PULL_FILE):
-    with open(LAST_PULL_FILE, "r") as f:
-      last_date = f.read().strip()
-      if last_date:
-        return f"(SINCE {last_date})"
-
+  config = db.get(AppConfig, "last_email_pull")
+  if config and config.value:
+    return f"(SINCE {config.value})"
   return "ALL"
 
 
-def update_last_pull_date():
+def update_last_pull_date(db):
   """Writes today's date to the last_email_pull.txt file."""
   today_str = date.today().strftime("%d-%b-%Y")
-  with open(LAST_PULL_FILE, "w") as f:
-    f.write(today_str)
+    
+  config = db.get(AppConfig, "last_email_pull")
+  if not config:
+    config = AppConfig(key="last_email_pull", value=today_str)
+    db.add(config)
+  else:
+    config.value = today_str
+    
+  db.commit()
 
 
 def find_parent(mail: imaplib.IMAP4_SSL, references: list[str]) -> str | None:
@@ -72,8 +74,8 @@ def find_parent(mail: imaplib.IMAP4_SSL, references: list[str]) -> str | None:
     return None
 
 
-def fetch_email_ids(mail):
-    search_criteria = get_search_criteria()
+def fetch_email_ids(mail, db):
+    search_criteria = get_search_criteria(db)
     print(f"Using IMAP search criteria: {search_criteria}")
 
     status, messages = mail.search(None, search_criteria)
@@ -144,7 +146,7 @@ def process_new_emails(db):
     mail.login(IMAP_USER, IMAP_PASSWORD)
     mail.select("INBOX")
 
-    email_ids = fetch_email_ids(mail)
+    email_ids = fetch_email_ids(mail, db)
     if email_ids is None:
         mail.logout()
         return None
@@ -173,6 +175,6 @@ def process_new_emails(db):
 
     mail.logout()
 
-    update_last_pull_date()
+    update_last_pull_date(db)
 
     return email_batch_results, entry_batch_results

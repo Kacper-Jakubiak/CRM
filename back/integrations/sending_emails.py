@@ -69,8 +69,8 @@ def send_email(
         msg.attach(MIMEText(html_content, "html"))
 
     # print(msg.as_string())
+    # return "OK"
 
-    # return "NOT"
     try:
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
             server.login(SENDER_EMAIL, SENDER_PASSWORD)

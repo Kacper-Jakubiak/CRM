@@ -47,9 +47,11 @@ def batch_ingest_emails(payload: EmailBatchIngestRequest, db: Session = Depends(
     return email_messages
 
 
-# ------------------------------------------------------------------
-# THREAD ROUTES (Must be placed BEFORE dynamic /{provider_message_id} routes)
-# ------------------------------------------------------------------
+@router.post("/all/status")
+def update_all_emails(needs_response: bool, db: Session = Depends(get_db)):
+    email_service.update_all_email_status(db, needs_response)
+    return
+
 
 @router.patch("/threads/merge", response_model=list[EmailMessageReply])
 def merge_threads(old_thread_id: int, new_thread_id: int, db: Session = Depends(get_db)):

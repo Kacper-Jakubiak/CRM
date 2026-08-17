@@ -155,6 +155,11 @@ def update_email_status(db: Session, provider_message_id: str, needs_response: b
     return to_email_message_reply(message)
 
 
+def update_all_email_status(db: Session, needs_response: bool) -> None:
+    db.query(EmailMessage).update({EmailMessage.needs_response: needs_response}, synchronize_session=False)
+    db.commit()
+
+
 def get_email(db: Session, provider_message_id: str) -> EmailMessageReply | None:
     message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
     if message is None:

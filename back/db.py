@@ -14,6 +14,13 @@ class Base(DeclarativeBase):
     pass
 
 
+class AppConfig(Base):
+    __tablename__ = "app_config"
+
+    key: Mapped[str] = mapped_column(primary_key=True)
+    value: Mapped[str] = mapped_column(nullable=False)
+
+
 class Company(Base):
     __tablename__ = "companies"
 
