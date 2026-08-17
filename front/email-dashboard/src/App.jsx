@@ -257,7 +257,7 @@ function MessageThreadList({ messages, messageFilter, onMessageUpdate, onThreadM
 }
 
 function App() {
-  const [view, setView] = useState('courses');
+  const [view, setView] = useState('customers');
   const [theme, setTheme] = useState('dark');
   const [courses, setCourses] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -268,7 +268,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [messageFilter, setMessageFilter] = useState('all');
-  const [middleView, setMiddleView] = useState('entries');
+  const [middleView, setMiddleView] = useState('emails');
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [isHtmlReply, setIsHtmlReply] = useState(false);
