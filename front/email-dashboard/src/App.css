@@ -1,15 +1,15 @@
 :root {
   --bg: #ffffff;
-  --panel: #f8fafc;
-  --panel-alt: #e2e8f0;
-  --line: #64748b;
-  --text: #020617;
-  --muted: #334155;
-  --accent: #0f172a;
-  --accent-soft: #cbd5e1;
+  --panel: #f5f5f5;
+  --panel-alt: #e5e5e5;
+  --line: #737373;
+  --text: #000000;
+  --muted: #404040;
+  --accent: #1d4ed8;
+  --accent-soft: #dbeafe;
   --success-bg: #dcfce7;
   --success-text: #14532d;
-  --shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 * {
@@ -41,17 +41,17 @@ button {
 }
 
 .app-shell.theme-dark {
-  --bg: #030712;
-  --panel: #111827;
-  --panel-alt: #1f2937;
-  --line: #4b5563;
+  --bg: #0a0a0a;
+  --panel: #171717;
+  --panel-alt: #262626;
+  --line: #737373;
   --text: #ffffff;
-  --muted: #d1d5db;
-  --accent: #f9fafb;
-  --accent-soft: rgba(249, 250, 251, 0.18);
+  --muted: #d4d4d4;
+  --accent: #3b82f6;
+  --accent-soft: rgba(59, 130, 246, 0.25);
   --success-bg: rgba(34, 197, 94, 0.25);
   --success-text: #86efac;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 
 .topbar {
@@ -98,7 +98,7 @@ button {
 .sync-button {
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--bg);
+  color: #ffffff;
 }
 
 .sync-button:disabled {
@@ -296,7 +296,7 @@ button {
   font-size: 13px;
   height: auto;
   background: var(--accent);
-  color: var(--bg);
+  color: #ffffff;
   border: 1px solid var(--line);
   border-radius: 6px;
 }
@@ -320,17 +320,6 @@ button {
   background: var(--accent-soft);
   border-color: var(--accent);
   border-left-color: var(--accent);
-}
-
-.content-panel {
-  overflow: hidden;
-}
-
-.content-inner {
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-  overflow: hidden;
 }
 
 .status-text-info {
@@ -481,6 +470,7 @@ button {
   gap: 6px;
   flex-wrap: nowrap;
   padding: 0px 8px;
+  border-left: 3px solid var(--accent);
 }
 
 .thread-header.expanded {
@@ -496,7 +486,7 @@ button {
   background: var(--panel);
   color: var(--text);
   font-size: 0.6rem;
-  padding: 2px 5px;
+  padding: 3px 6px;
 }
 
 .btn-collapse,
@@ -506,7 +496,7 @@ button {
   border: 1px solid var(--line);
   color: var(--text);
   font-size: 0.55rem;
-  padding: 0px 4px;
+  padding: 2px 5px;
   background: var(--panel);
 }
 
@@ -539,17 +529,11 @@ button {
 
 .input-target-id {
   width: 55px;
-  padding: 0px 4px;
-  font-size: 0.55rem;
+  padding: 2px 4px;
+  font-size: 0.6rem;
   border-radius: 4px;
   border: 1px solid var(--line);
   background: var(--panel);
-  color: var(--text);
-}
-
-.btn-merge {
-  background: var(--accent-soft);
-  border-color: var(--accent);
   color: var(--text);
 }
 
@@ -574,6 +558,11 @@ button {
   list-style: none;
   cursor: pointer;
   line-height: 1.4;
+  transition: background 0.15s ease;
+}
+
+.email-item.selected {
+  background: var(--accent-soft);
 }
 
 .email-header {
@@ -678,14 +667,8 @@ button {
 .email-actions-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   min-width: 112px;
-}
-
-.btn-reply {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--text);
 }
 
 .btn-send {
@@ -697,7 +680,7 @@ button {
 .app-shell.theme-dark .btn-send {
   background: #22c55e;
   border-color: #15803d;
-  color: #022c22;
+  color: #000000;
 }
 
 .btn-cancel {
@@ -710,6 +693,16 @@ button {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--panel-alt);
+  display: flex;
+  flex-direction: column;
+}
+
+.reply-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  margin-bottom: 6px;
 }
 
 .reply-textarea {
@@ -724,21 +717,14 @@ button {
   resize: vertical;
 }
 
-.reply-actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-}
-
 .html-toggle-label {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   font-size: 0.65rem;
   color: var(--muted);
-  margin-right: auto;
+  cursor: pointer;
+  margin-left: 2px;
 }
 
 .hidden-msg-text {
@@ -755,7 +741,7 @@ button {
 .email-detail {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   padding: 12px 14px 14px;
   overflow-y: auto;
 }
@@ -767,19 +753,34 @@ button {
   gap: 8px;
 }
 
-.selected-email-actions,
-.move-message-row {
+.email-detail__header-info {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.72rem;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.email-detail__from,
+.email-detail__subject {
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .selected-email-actions {
-  justify-content: flex-end;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .move-message-row {
-  padding-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
 }
 
 .badge {
@@ -888,15 +889,15 @@ button {
 }
 
 .divider-bottom {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  border-bottom: 1px solid var(--line);
 }
 
 .course-item:not(:last-child) {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  border-bottom: 1px solid var(--line);
 }
 
 .company-group:not(:last-child) {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  border-bottom: 1px solid var(--line);
 }
 
 .company-header {
@@ -905,9 +906,8 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   padding: 3px 10px;
-  background-color: rgba(128, 128, 128, 0.15);
+  background-color: var(--panel-alt);
   border-radius: 4px;
-  /* margin-top: 2px; */
   margin-bottom: 4px;
   display: flex;
   align-items: center;
@@ -930,7 +930,7 @@ button {
 
 .company-header-count {
   font-size: 0.6rem;
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
 .customer-item-nested {
@@ -938,7 +938,7 @@ button {
 }
 
 .customer-item-nested:not(:last-child) {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+  border-bottom: 1px solid var(--line);
 }
 
 .list-item-name {

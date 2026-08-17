@@ -34,11 +34,14 @@ const groupEntriesByDate = (entries) => {
     });
 };
 
-function DisplayEmail({ msg, customerEmail, onSelectMessage }) {
+function DisplayEmail({ msg, customerEmail, onSelectMessage, isSelected }) {
   const emailAddress = customerEmail || msg.sender || 'Unknown';
 
   return (
-    <li className="email-item" onClick={() => onSelectMessage && onSelectMessage(msg)}>
+    <li
+      className={`email-item ${isSelected ? 'selected' : ''}`}
+      onClick={() => onSelectMessage && onSelectMessage(msg)}
+    >
       <div className="email-header">
         <strong className="email-subject">{msg.subject || '(No Subject)'}</strong>
         <span className="email-timestamp">{msg.sent_at ? new Date(msg.sent_at).toLocaleString() : ''}</span>
@@ -195,6 +198,7 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
             onMessageUpdate={handleLocalMessageUpdate}
             onThreadMoved={onThreadMoved}
             onSelectMessage={onSelectMessage}
+            isSelected={selectedEmail?.provider_message_id === msg.provider_message_id}
           />
         ))}
       </ul>
@@ -970,6 +974,15 @@ function App() {
                 <span className="email-detail__timestamp">{selectedEmail.sent_at ? new Date(selectedEmail.sent_at).toLocaleString() : ''}</span>
               </div>
 
+              <div className="email-detail__header-info">
+                <div className="email-detail__from">
+                  <strong>From:</strong> {selectedEmail.customer_email || selectedEmail.sender || 'Unknown'}
+                </div>
+                <div className="email-detail__subject">
+                  <strong>Subject:</strong> {selectedEmail.subject || '(No Subject)'}
+                </div>
+              </div>
+
               <div className="selected-email-actions">
                 <button
                   type="button"
@@ -986,23 +999,39 @@ function App() {
                 >
                   {togglingStatus ? '...' : selectedEmail.needs_response ? 'Resolve' : 'Reopen'}
                 </button>
-              </div>
 
-              <div className="move-message-row">
-                <input
-                  type="number"
-                  placeholder="Move to thread ID"
-                  value={moveThreadTarget}
-                  onChange={(e) => setMoveThreadTarget(e.target.value)}
-                  className="input-target-id"
-                />
-                <button type="button" className="btn-merge" onClick={handleMoveMessage} disabled={movingEmail}>
-                  {movingEmail ? 'Moving...' : 'Move to thread'}
-                </button>
+                <div className="move-message-row">
+                  <input
+                    type="number"
+                    placeholder="Move ID"
+                    value={moveThreadTarget}
+                    onChange={(e) => setMoveThreadTarget(e.target.value)}
+                    className="input-target-id"
+                  />
+                  <button type="button" className="btn-merge" onClick={handleMoveMessage} disabled={movingEmail}>
+                    {movingEmail ? 'Moving...' : 'Move'}
+                  </button>
+                </div>
               </div>
 
               {isReplying && (
                 <div className="reply-form compact">
+                  <div className="reply-form-header">
+                    <button type="button" className="btn-send" onClick={handleSendReply} disabled={sendingReply}>
+                      {sendingReply ? 'Sending...' : 'Send'}
+                    </button>
+                    <button type="button" className="btn-cancel" onClick={() => setIsReplying(false)}>
+                      Cancel
+                    </button>
+                    <label className="html-toggle-label">
+                      <input 
+                        type="checkbox" 
+                        checked={isHtmlReply} 
+                        onChange={(e) => setIsHtmlReply(e.target.checked)} 
+                      />
+                      HTML
+                    </label>
+                  </div>
                   <textarea
                     rows="4"
                     value={replyText}
@@ -1010,22 +1039,6 @@ function App() {
                     placeholder="Type your reply here..."
                     className="reply-textarea"
                   />
-                  <div className="reply-actions">
-                    <label className="html-toggle-label">
-                      <input 
-                        type="checkbox" 
-                        checked={isHtmlReply} 
-                        onChange={(e) => setIsHtmlReply(e.target.checked)} 
-                      />
-                      Send as HTML
-                    </label>
-                    <button type="button" className="btn-send" onClick={handleSendReply} disabled={sendingReply}>
-                      {sendingReply ? 'Sending...' : 'Send'}
-                    </button>
-                    <button type="button" className="btn-cancel" onClick={() => setIsReplying(false)}>
-                      Cancel
-                    </button>
-                  </div>
                 </div>
               )}
 
