@@ -4,8 +4,7 @@ pydantic
 pydantic[email]
 sqlalchemy
 psycopg2-binary
-httpx
-beautifulsoup4
 python-dotenv
 jinja2
 dotenv
+requests

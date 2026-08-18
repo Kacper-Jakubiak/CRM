@@ -4,8 +4,12 @@ import os
 
 from sqlalchemy import create_engine, ForeignKey, func, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
+from dotenv import load_dotenv
 
+load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+
 engine = create_engine(DATABASE_URL, connect_args={"prepare_threshold": None})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -25,7 +29,6 @@ class Company(Base):
     __tablename__ = "companies"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # name: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
     domain: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
 
     customers: Mapped[List["Customer"]] = relationship("Customer", back_populates="company")
@@ -35,7 +38,7 @@ class Customer(Base):
     __tablename__ = "customers"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(nullable=False)
+    name: Mapped[str] = mapped_column(nullable=False, default="")
     email: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
     note: Mapped[str] = mapped_column(nullable=False, default="")
@@ -66,7 +69,6 @@ class EmailMessage(Base):
     sent_at: Mapped[datetime] = mapped_column(nullable=False)
     needs_response: Mapped[bool] = mapped_column(nullable=False)
     category: Mapped[str] = mapped_column(nullable=False)
-
     thread_id: Mapped[int] = mapped_column(ForeignKey("threads.id"), index=True, nullable=False)
 
     customer: Mapped["Customer"] = relationship("Customer", back_populates="email_messages")

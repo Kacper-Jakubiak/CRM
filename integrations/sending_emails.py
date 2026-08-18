@@ -6,11 +6,13 @@ from dotenv import load_dotenv
 from jinja2 import Template
 
 load_dotenv()
+SENDER_EMAIL: str = os.getenv("CDSI_EMAIL_USER", "")
+SENDER_PASSWORD: str = os.getenv("CDSI_EMAIL_PASSWORD", "")
+
 
 SMTP_SERVER = "poczta.agh.edu.pl"
 SMTP_PORT = 465
-SENDER_EMAIL: str = os.getenv("CDSI_EMAIL_USER", "")
-SENDER_PASSWORD: str = os.getenv("CDSI_EMAIL_PASSWORD", "")
+
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>

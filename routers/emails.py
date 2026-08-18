@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from dependencies import get_db
-from schemas import EmailIngestRequest, EmailBatchIngestRequest, EmailMessageReply
+from schemas import EmailBatchIngestRequest, EmailMessageResponse
 from services import email_service
 
 router = APIRouter(
@@ -11,58 +12,58 @@ router = APIRouter(
 )
 
 
-@router.get("", response_model=list[EmailMessageReply])
+@router.get("", response_model=list[EmailMessageResponse])
 def list_emails(db: Session = Depends(get_db)):
-    email_messages = email_service.get_emails(db)
-    return email_messages
-
-
-@router.post("", status_code=status.HTTP_201_CREATED)
-def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
-    email_message = email_service.ingest_email(
-        db=db,
-        provider_message_id=payload.provider_message_id,
-        customer_email=payload.customer_email,
-        category=payload.category,
-        needs_response=payload.needs_response,
-        subject=payload.subject,
-        body=payload.body,
-        sent_at=payload.sent_at,
-        parent_message_provider_id=payload.parent_message_provider_id
-    )
-
-    if email_message is None:
+    try:
+        email_messages = email_service.get_emails(db=db)
+        return email_messages
+    except SQLAlchemyError:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Message {payload.provider_message_id} already exists"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve emails"
         )
 
-    return email_message
 
-
-@router.post("/batch", status_code=status.HTTP_201_CREATED, response_model=list[EmailMessageReply])
+@router.post("/batch", status_code=status.HTTP_201_CREATED, response_model=list[EmailMessageResponse])
 def batch_ingest_emails(payload: EmailBatchIngestRequest, db: Session = Depends(get_db)):
-    email_messages = email_service.ingest_email_batch(db, [message.model_dump() for message in payload.messages])
+    try:
+        email_messages = email_service.ingest_email_batch(
+            db=db, 
+            emails=[message.model_dump() for message in payload.messages]
+        )
+        return email_messages
+    except (SQLAlchemyError, ValueError, KeyError):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process email batch ingestion"
+        )
 
-    if email_messages is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email messages not found")
 
-    return email_messages
-
-
-@router.post("/all/status")
+@router.post("/all/status", status_code=status.HTTP_204_NO_CONTENT)
 def update_all_emails(needs_response: bool, db: Session = Depends(get_db)):
-    email_service.update_all_email_status(db, needs_response)
-    return
+    try:
+        email_service.update_all_email_status(db=db, needs_response=needs_response)
+        return
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update email statuses"
+        )
 
 
-@router.patch("/threads/merge", response_model=list[EmailMessageReply])
+@router.patch("/threads/merge", response_model=list[EmailMessageResponse])
 def merge_threads(old_thread_id: int, new_thread_id: int, db: Session = Depends(get_db)):
-    email_messages = email_service.merge_threads(
-        db=db,
-        old_thread_id=old_thread_id,
-        new_thread_id=new_thread_id
-    )
+    try:
+        email_messages = email_service.merge_threads(
+            db=db,
+            old_thread_id=old_thread_id,
+            new_thread_id=new_thread_id
+        )
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to merge threads"
+        )
 
     if email_messages is None:
         raise HTTPException(
@@ -73,9 +74,15 @@ def merge_threads(old_thread_id: int, new_thread_id: int, db: Session = Depends(
     return email_messages
 
 
-@router.get("/thread-messages", response_model=list[EmailMessageReply])
+@router.get("/thread-messages", response_model=list[EmailMessageResponse])
 def get_thread_messages(thread_id: int, db: Session = Depends(get_db)):
-    email_messages = email_service.get_thread_messages(db, thread_id)
+    try:
+        email_messages = email_service.get_thread_messages(db=db, thread_id=thread_id)
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve thread messages"
+        )
 
     if email_messages is None:
         raise HTTPException(
@@ -86,23 +93,15 @@ def get_thread_messages(thread_id: int, db: Session = Depends(get_db)):
     return email_messages
 
 
-@router.get("/message", response_model=EmailMessageReply)
+@router.get("/message", response_model=EmailMessageResponse)
 def get_message(provider_message_id: str, db: Session = Depends(get_db)):
-    email_message = email_service.get_email(db, provider_message_id)
-
-    if email_message is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
-
-    return email_message
-
-
-@router.patch("/status", response_model=EmailMessageReply)
-def update_message_status(provider_message_id: str, needs_response: bool, db: Session = Depends(get_db)):
-    email_message = email_service.update_email_status(
-        db=db,
-        provider_message_id=provider_message_id,
-        needs_response=needs_response
-    )
+    try:
+        email_message = email_service.get_email(db=db, provider_message_id=provider_message_id)
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve message"
+        )
 
     if email_message is None:
         raise HTTPException(
@@ -113,13 +112,42 @@ def update_message_status(provider_message_id: str, needs_response: bool, db: Se
     return email_message
 
 
-@router.patch("/move", response_model=EmailMessageReply)
+@router.patch("/status", response_model=EmailMessageResponse)
+def update_message_status(provider_message_id: str, needs_response: bool, db: Session = Depends(get_db)):
+    try:
+        email_message = email_service.update_email_status(
+            db=db,
+            provider_message_id=provider_message_id,
+            needs_response=needs_response
+        )
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update message status"
+        )
+
+    if email_message is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message not found"
+        )
+
+    return email_message
+
+
+@router.patch("/move", response_model=EmailMessageResponse)
 def move_message_to_thread(provider_message_id: str, new_thread_id: int, db: Session = Depends(get_db)):
-    email_message = email_service.move_email_to_thread(
-        db=db,
-        provider_message_id=provider_message_id,
-        new_thread_id=new_thread_id
-    )
+    try:
+        email_message = email_service.move_email_to_thread(
+            db=db,
+            provider_message_id=provider_message_id,
+            new_thread_id=new_thread_id
+        )
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to move message"
+        )
 
     if email_message is None:
         raise HTTPException(

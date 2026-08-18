@@ -5,7 +5,7 @@ class EmailClassifier:
     def __init__(self, course_names: list[str]):
         self.course_names = course_names
 
-    def classify_category(self, process_result: dict[str, str]) -> dict[str, str | bool]:
+    def classify_category(self, process_result: dict[str, str]) -> tuple[str, bool]:
         category = "_".join(check_course_names(self.course_names, process_result)).lower() or "other"
 
         stripped_body_text = strip_body(process_result["body"])
@@ -15,10 +15,7 @@ class EmailClassifier:
         else:
            needs_response = AI_analysis(subject=process_result["subject"], body=stripped_body_text, sender=process_result["customer_email"])       
             
-        return {
-            "category": category,
-            "needs_response": needs_response
-        }
+        return category, needs_response
     
 
 def check_course_names(course_names: list[str], process_result: dict) -> list[str]:
@@ -34,7 +31,7 @@ def check_course_names(course_names: list[str], process_result: dict) -> list[st
   return found_courses
 
 
-def extract_course_details(text: str):
+def extract_course_details(text: str) -> dict[str, str]:
     lines = [line.strip() for line in text.split('\n') if line.strip()]
 
     date_match = re.search(r'Termin:\s*(\d{2}\.\d{2}\.\d{4})', text)
