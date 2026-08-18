@@ -380,7 +380,7 @@ function App() {
       const entriesData = await entriesRes.json();
       const messagesData = await messagesRes.json();
 
-      const foundCustomer = customers.find((c) => (c.customer_email || c.email) === email);
+      const foundCustomer = customers.find((c) => (c.email) === email);
       const customerObj = foundCustomer || messagesData.customer || entriesData.customer || { email };
 
       setCustomerHistory({
@@ -388,7 +388,7 @@ function App() {
         messages: messagesData,
         course_entries: entriesData,
       });
-      setCustomerNote((customerObj.customer_note || customerObj.note) || '');
+      setCustomerNote(customerObj.note || '');
     } catch (err) {
       console.error('Error fetching customer history:', err);
     } finally {
@@ -530,7 +530,7 @@ function App() {
           subject: `Re: ${selectedEmail.subject || 'No Subject'}`,
           body: replyText,
           reply_message_id: selectedEmail.provider_message_id,
-          add_html: isHtmlReply
+          should_add_html: isHtmlReply
         }),
       });
 
@@ -604,12 +604,12 @@ function App() {
       }
 
       const updated = await res.json();
-      setCustomers((prev) => prev.map((c) => (c.customer_email === updated.customer_email ? { ...c, customer_note: updated.customer_note } : c)));
+      setCustomers((prev) => prev.map((c) => (c.email === updated.email ? { ...c, note: updated.note } : c)));
       setCustomerHistory((prev) => ({
         ...prev,
-        customer: { ...prev.customer, customer_note: updated.customer_note, note: updated.customer_note },
+        customer: { ...prev.customer, note: updated.note },
       }));
-      setCustomerNote(updated.customer_note || '');
+      setCustomerNote(updated.note || '');
       alert('Customer note saved');
     } catch (err) {
       console.error('Error saving customer note:', err);
@@ -622,21 +622,21 @@ function App() {
   const q = searchQuery.trim().toLowerCase();
 
   const filteredCourses = courses
-    .filter((c) => (q ? c.course_name.toLowerCase().includes(q) : true))
+    .filter((c) => (q ? c.name.toLowerCase().includes(q) : true))
     .slice();
-  filteredCourses.sort((a, b) => a.course_name.localeCompare(b.course_name));
+  filteredCourses.sort((a, b) => a.name.localeCompare(b.name));
 
   const filteredCustomers = customers
     .filter((c) => {
       if (!q) return true;
-      const email = (c.customer_email || '').toLowerCase();
-      const name = (c.customer_name || '').toLowerCase();
-      const note = (c.customer_note || c.note || '').toLowerCase();
+      const email = (c.email || '').toLowerCase();
+      const name = (c.name || '').toLowerCase();
+      const note = (c.note || '').toLowerCase();
       const company = (c.company_name || c.company_id ? String(c.company_id) : '').toLowerCase();
       return email.includes(q) || name.includes(q) || note.includes(q) || company.includes(q);
     })
     .slice();
-  filteredCustomers.sort((a, b) => (a.customer_email || '').localeCompare(b.customer_email || ''));
+  filteredCustomers.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
 
   const customersByCompany = Object.entries(
     filteredCustomers.reduce((acc, c) => {
@@ -708,12 +708,12 @@ function App() {
               ) : (
                 filteredCourses.map((item) => (
                   <button
-                    key={item.course_id}
-                    className={`${selectedCourse === item.course_name ? 'list-item active' : 'list-item'} list-item-plain course-item`}
-                    onClick={() => handleCourseClick(item.course_name)}
+                    key={item.id}
+                    className={`${selectedCourse === item.name ? 'list-item active' : 'list-item'} list-item-plain course-item`}
+                    onClick={() => handleCourseClick(item.name)}
                     type="button"
                   >
-                    {item.course_name}
+                    {item.name}
                   </button>
                 ))
               )
@@ -737,25 +737,25 @@ function App() {
 
                       {!isCollapsed && custs.map((item) => (
                         <button
-                          key={item.customer_id}
-                          className={`${selectedCustomer === item.customer_email ? 'list-item active' : 'list-item'} list-item-plain list-item-flex customer-item-nested`}
-                          onClick={() => handleCustomerClick(item.customer_email)}
+                          key={item.id}
+                          className={`${selectedCustomer === item.email ? 'list-item active' : 'list-item'} list-item-plain list-item-flex customer-item-nested`}
+                          onClick={() => handleCustomerClick(item.email)}
                           type="button"
                         >
                           <div className="list-item-customer-details">
-                            {item.customer_name && (
+                            {item.name && (
                               <span className="list-item-name">
-                                {item.customer_name}
+                                {item.name}
                               </span>
                             )}
-                            <span className="list-item-email" title={item.customer_email}>
-                              {item.customer_email}
+                            <span className="list-item-email" title={item.email}>
+                              {item.email}
                             </span>
                           </div>
                           
-                          {(item.customer_note || item.note) && (
-                            <span className="list-item-note" title={item.customer_note || item.note}>
-                              {item.customer_note || item.note}
+                          {item.note && (
+                            <span className="list-item-note" title={item.note}>
+                              {item.note}
                             </span>
                           )}
                         </button>
@@ -808,7 +808,7 @@ function App() {
                           <div className="entry-group-title">Date: {group.dateLabel}</div>
                           <ul className="group-entry-list">
                             {group.items.map((entry) => (
-                              <li key={entry.course_entry_id} className="entry-item">
+                              <li key={entry.id} className="entry-item">
                                 <strong>Email:</strong> {entry.customer_email || 'Unknown'}
                               </li>
                             ))}
@@ -850,9 +850,9 @@ function App() {
               <div className="panel-header">
                 <h2>
                   {
-                    customerHistory.customer?.customer_name
-                      ? `${customerHistory.customer.customer_name} (${customerHistory.customer?.customer_email || customerHistory.customer?.email || selectedCustomer})`
-                      : (customerHistory.customer?.customer_email || customerHistory.customer?.email || selectedCustomer)
+                    customerHistory.customer?.name
+                      ? `${customerHistory.customer.name} (${customerHistory.customer?.email || selectedCustomer})`
+                      : (customerHistory.customer?.email || selectedCustomer)
                   }
                 </h2>
               </div>
@@ -939,7 +939,7 @@ function App() {
                           <div className="entry-group-title">Date: {group.dateLabel}</div>
                           <ul className="group-entry-list">
                             {group.items.map((entry) => (
-                              <li key={entry.course_entry_id} className="entry-item">
+                              <li key={entry.id} className="entry-item">
                                 <strong>Course:</strong> {entry.course_name}
                               </li>
                             ))}
@@ -974,7 +974,7 @@ function App() {
 
               <div className="email-detail__header-info">
                 <div className="email-detail__from">
-                  <strong>From:</strong> {selectedEmail.customer_email || selectedEmail.sender || 'Unknown'}
+                  <strong>From:</strong> {selectedEmail.sender || selectedCustomer}
                 </div>
                 <div className="email-detail__subject">
                   <strong>Subject:</strong> {selectedEmail.subject || '(No Subject)'}
