@@ -1,0 +1,25 @@
+{
+    "builds": [
+      {
+        "src": "back/main.py",
+        "use": "@vercel/python"
+      },
+      {
+        "src": "front/email-dashboard/package.json",
+        "use": "@vercel/static-build",
+        "config": {
+          "distDir": "dist"
+        }
+      }
+    ],
+    "routes": [
+      {
+        "src": "/api/(.*)",
+        "dest": "back/main.py"
+      },
+      {
+        "src": "/(.*)",
+        "dest": "/front/email-dashboard/$1"
+      }
+    ]
+  }

@@ -687,7 +687,7 @@ function App() {
             <button
               type="button"
               className={
-                (view === 'courses' && selectedCourse === 'All') || (view === 'customers' && selectedCustomer === 'All')
+                selectedCourse === 'All' || selectedCustomer === 'All'
                   ? 'list-item all-button active'
                   : 'list-item all-button'
               }
@@ -776,7 +776,7 @@ function App() {
           {!loading && selectedCourse && (
             <div className="content-inner">
               <div className="panel-header">
-                <h2>Course details: {selectedCourse}</h2>
+                <h2>{selectedCourse}</h2>
               </div>
 
               <div className="detail-toggle-row">
@@ -851,7 +851,7 @@ function App() {
             <div className="content-inner">
               <div className="panel-header">
                 <h2>
-                  Customer history: {
+                  {
                     customerHistory.customer?.customer_name
                       ? `${customerHistory.customer.customer_name} (${customerHistory.customer?.customer_email || customerHistory.customer?.email || selectedCustomer})`
                       : (customerHistory.customer?.customer_email || customerHistory.customer?.email || selectedCustomer)
