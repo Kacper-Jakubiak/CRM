@@ -3,7 +3,7 @@ uvicorn
 pydantic
 pydantic[email]
 sqlalchemy
-psycopg[binary]
+psycopg2-binary
 httpx
 beautifulsoup4
 python-dotenv
