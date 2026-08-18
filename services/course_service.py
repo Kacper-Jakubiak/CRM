@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 
-from db import Course, CourseEntry, Customer, EmailMessage
+from db import Course, CourseEntry, EmailMessage
 from integrations.course_parser import find_courses
 from schemas import CourseEntryReply, EmailMessageReply
 from util.schema_translations import to_entry_reply, to_email_message_reply

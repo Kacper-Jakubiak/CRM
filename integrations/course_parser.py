@@ -1,17 +1,31 @@
-from playwright.sync_api import sync_playwright
+import httpx
+from bs4 import BeautifulSoup
+
 
 def find_courses() -> list[str]:
-  with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)
-    page = browser.new_page()
+  url = "https://szkolenia.cdsi.agh.edu.pl/"
+  headers = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  }
 
-    page.goto("https://szkolenia.cdsi.agh.edu.pl/")
-    page.wait_for_selector(".card-col-wrapper")
+  # Fetch the raw HTML content
+  response = httpx.get(url, headers=headers, follow_redirects=True)
+  response.raise_for_status()
 
-    course_names = page.locator(".card-col-wrapper .card-title").all_inner_texts()
+  # Parse HTML
+  soup = BeautifulSoup(response.text, "html.parser")
 
-    print(f"Found {len(course_names)} courses")
+  # Select all elements matching '.card-col-wrapper .card-title'
+  wrappers = soup.select(".card-col-wrapper")
+  
+  course_names = []
+  for wrapper in wrappers:
+      title_elem = wrapper.select_one(".card-title")
+      if title_elem:
+          text = title_elem.get_text(strip=True)
+          if text:
+              course_names.append(" ".join(text.split()))
 
-    browser.close()
+  print(f"Found {len(course_names)} courses", flush=True)
 
-    return [" ".join(course_name.split()) for course_name in course_names]
+  return course_names

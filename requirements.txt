@@ -3,10 +3,9 @@ uvicorn
 pydantic
 pydantic[email]
 sqlalchemy
-requests
-playwright
+psycopg[binary]
+httpx
+beautifulsoup4
 python-dotenv
-ollama
 jinja2
-uv
-psycopg2-binary
+dotenv
