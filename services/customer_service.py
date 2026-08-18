@@ -81,3 +81,4 @@ def get_customer_messages(db: Session, email_address: str) -> list[EmailMessageR
     )
 
     return [to_email_message_reply(message) for message in messages]
+

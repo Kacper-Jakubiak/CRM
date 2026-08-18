@@ -1,13 +1,13 @@
 from datetime import datetime
-from pathlib import Path
 from typing import List
+import os
 
 from sqlalchemy import create_engine, ForeignKey, func, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
-DB_PATH = Path(__file__).parent / "app.db"
-engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(bind=engine)
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+engine = create_engine(DATABASE_URL, connect_args={"prepare_threshold": None})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 class Base(DeclarativeBase):
@@ -92,6 +92,3 @@ class Thread(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     messages: Mapped[List["EmailMessage"]] = relationship("EmailMessage", back_populates="thread", cascade="all, delete-orphan")
-
-
-Base.metadata.create_all(bind=engine)

@@ -32,7 +32,10 @@ def ingest_email(payload: EmailIngestRequest, db: Session = Depends(get_db)):
     )
 
     if email_message is None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Message {payload.provider_message_id} already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Message {payload.provider_message_id} already exists"
+        )
 
     return email_message
 
@@ -63,27 +66,27 @@ def merge_threads(old_thread_id: int, new_thread_id: int, db: Session = Depends(
 
     if email_messages is None:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="One or both threads not found"
         )
 
     return email_messages
 
 
-@router.get("/threads/{thread_id}", response_model=list[EmailMessageReply])
+@router.get("/thread-messages", response_model=list[EmailMessageReply])
 def get_thread_messages(thread_id: int, db: Session = Depends(get_db)):
     email_messages = email_service.get_thread_messages(db, thread_id)
 
     if email_messages is None:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Thread not found"
         )
 
     return email_messages
 
 
-@router.get("/{provider_message_id}", response_model=EmailMessageReply)
+@router.get("/message", response_model=EmailMessageReply)
 def get_message(provider_message_id: str, db: Session = Depends(get_db)):
     email_message = email_service.get_email(db, provider_message_id)
 
@@ -93,7 +96,7 @@ def get_message(provider_message_id: str, db: Session = Depends(get_db)):
     return email_message
 
 
-@router.patch("/{provider_message_id}/status", response_model=EmailMessageReply)
+@router.patch("/status", response_model=EmailMessageReply)
 def update_message_status(provider_message_id: str, needs_response: bool, db: Session = Depends(get_db)):
     email_message = email_service.update_email_status(
         db=db,
@@ -103,14 +106,14 @@ def update_message_status(provider_message_id: str, needs_response: bool, db: Se
 
     if email_message is None:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Message not found"
         )
 
     return email_message
 
 
-@router.patch("/{provider_message_id}/move", response_model=EmailMessageReply)
+@router.patch("/move", response_model=EmailMessageReply)
 def move_message_to_thread(provider_message_id: str, new_thread_id: int, db: Session = Depends(get_db)):
     email_message = email_service.move_email_to_thread(
         db=db,
@@ -120,7 +123,7 @@ def move_message_to_thread(provider_message_id: str, new_thread_id: int, db: Ses
 
     if email_message is None:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Message or thread not found"
         )
 

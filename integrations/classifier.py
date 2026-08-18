@@ -17,7 +17,7 @@ class EmailClassifier:
         if '?' in stripped_body_text:
            needs_response = True
         else:
-           needs_response = AI_analysis(subject=process_result["subject"], body=stripped_body_text, sender=process_result["customer_email"])       
+           needs_response = False#AI_analysis(subject=process_result["subject"], body=stripped_body_text, sender=process_result["customer_email"])       
             
         return {
             "category": category,

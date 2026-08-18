@@ -63,7 +63,7 @@ def add_course_entries_batch(payload: CourseEntryBatchRequest, db: Session = Dep
 
 
 
-@router.get("/{course_name}/entries", response_model=list[CourseEntryReply])
+@router.get("/course-entries", response_model=list[CourseEntryReply])
 def get_course_entries_by_name(course_name: str, db: Session = Depends(get_db)):
     entries = course_service.get_course_entries(db, course_name)
 
@@ -73,7 +73,7 @@ def get_course_entries_by_name(course_name: str, db: Session = Depends(get_db)):
     return entries
 
 
-@router.get("/{course_name}/emails", response_model=list[EmailMessageReply])
+@router.get("/emails", response_model=list[EmailMessageReply])
 def get_course_emails(course_name: str, db: Session = Depends(get_db)):
     email_messages = course_service.get_course_emails(db, course_name)
 

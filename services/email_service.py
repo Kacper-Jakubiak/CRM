@@ -88,6 +88,7 @@ def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailM
     ingested_messages = []
     
     customer_cache = {}
+    batch_thread_map = {}
 
     for email_data in emails:
         provider_message_id = email_data["provider_message_id"]
@@ -95,6 +96,7 @@ def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailM
         existing_message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
 
         if existing_message:
+            batch_thread_map[provider_message_id] = existing_message.thread_id
             continue
 
         customer_email = email_data["customer_email"]
@@ -102,15 +104,20 @@ def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailM
         
         thread_id = None
         if parent_message_provider_id:
-            parent = db.query(EmailMessage).filter_by(provider_message_id=parent_message_provider_id).first()
-            if parent:
-                thread_id = parent.thread_id
+            if parent_message_provider_id in batch_thread_map:
+                thread_id = batch_thread_map[parent_message_provider_id]
+            else:
+                parent = db.query(EmailMessage).filter_by(provider_message_id=parent_message_provider_id).first()
+                if parent:
+                    thread_id = parent.thread_id
 
         if thread_id is None:
             thread = Thread()
             db.add(thread)
             db.flush()
             thread_id = thread.id
+
+        batch_thread_map[provider_message_id] = thread_id
 
         if customer_email in customer_cache:
             customer_id = customer_cache[customer_email]

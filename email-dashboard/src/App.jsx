@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
-const API_BASE_URL = 'http://localhost:8000';
-
 const sortEntriesNewestFirst = (entries) => {
   return [...entries].sort((a, b) => {
     const dateA = a.course_date ? new Date(a.course_date).getTime() : 0;
@@ -76,7 +74,7 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
 
     setLoadingThread(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/emails/threads/${threadId}`);
+      const res = await fetch(`/api/emails/thread-messages?thread_id=${threadId}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.detail || 'Failed to fetch thread emails');
@@ -117,7 +115,7 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
     setMerging(true);
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/emails/threads/merge?old_thread_id=${threadId}&new_thread_id=${encodeURIComponent(targetThreadId)}`,
+        `/api/emails/threads/merge?old_thread_id=${threadId}&new_thread_id=${encodeURIComponent(targetThreadId)}`,
         { method: 'PATCH' }
       );
 
@@ -296,12 +294,12 @@ function App() {
   };
 
   const fetchCoursesAndCustomers = () => {
-    fetch(`${API_BASE_URL}/api/courses`)
+    fetch(`/api/courses`)
       .then((res) => res.json())
       .then((data) => setCourses(Array.isArray(data) ? data : []))
       .catch((err) => console.error('Error fetching courses:', err));
 
-    fetch(`${API_BASE_URL}/api/customers`)
+    fetch(`/api/customers`)
       .then((res) => res.json())
       .then((data) => setCustomers(Array.isArray(data) ? data : []))
       .catch((err) => console.error('Error fetching customers:', err));
@@ -321,8 +319,8 @@ function App() {
 
     try {
       const [entriesRes, messagesRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseName)}/entries`),
-        fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseName)}/emails`),
+        fetch(`/api/courses/course-entries?course_name=${encodeURIComponent(courseName)}`),
+        fetch(`/api/courses/emails?course_name=${encodeURIComponent(courseName)}`),
       ]);
 
       const entriesData = await entriesRes.json();
@@ -348,8 +346,8 @@ function App() {
 
     try {
       const [entriesRes, emailsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/courses/entries`),
-        fetch(`${API_BASE_URL}/api/emails`),
+        fetch(`/api/courses/entries`),
+        fetch(`/api/emails`),
       ]);
 
       const entriesData = entriesRes.ok ? await entriesRes.json() : [];
@@ -375,8 +373,8 @@ function App() {
 
     try {
       const [entriesRes, messagesRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(email)}/entries`),
-        fetch(`${API_BASE_URL}/api/customers/${encodeURIComponent(email)}/emails`),
+        fetch(`/api/customers/entries?email_address=${encodeURIComponent(email)}`),
+        fetch(`/api/customers/emails?email_address=${encodeURIComponent(email)}`),
       ]);
 
       const entriesData = await entriesRes.json();
@@ -407,8 +405,8 @@ function App() {
 
     try {
       const [entriesRes, emailsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/courses/entries`),
-        fetch(`${API_BASE_URL}/api/emails`),
+        fetch(`/api/courses/entries`),
+        fetch(`/api/emails`),
       ]);
 
       const entriesData = entriesRes.ok ? await entriesRes.json() : [];
@@ -441,7 +439,7 @@ function App() {
   const handleSyncData = async () => {
     setIsSyncing(true);
     try {
-      const coursesRes = await fetch(`${API_BASE_URL}/api/integrations/courses/import`, {
+      const coursesRes = await fetch(`/api/integrations/courses/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -451,7 +449,7 @@ function App() {
         throw new Error(errorData.detail || 'Failed to import courses');
       }
 
-      const emailsRes = await fetch(`${API_BASE_URL}/api/integrations/emails/pull`, {
+      const emailsRes = await fetch(`/api/integrations/emails/pull`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -497,7 +495,7 @@ function App() {
 
     try {
       const statusRes = await fetch(
-        `${API_BASE_URL}/api/emails/${selectedEmail.provider_message_id}/status?needs_response=${newStatus}`,
+        `/api/emails/status?provider_message_id=${encodeURIComponent(selectedEmail.provider_message_id)}&needs_response=${newStatus}`,
         { method: 'PATCH' }
       );
 
@@ -524,7 +522,7 @@ function App() {
     setSendingReply(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/integrations/send`, {
+      const response = await fetch(`/api/integrations/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -541,7 +539,7 @@ function App() {
       }
 
       const statusRes = await fetch(
-        `${API_BASE_URL}/api/emails/${selectedEmail.provider_message_id}/status?needs_response=false`,
+        `/api/emails/status?provider_message_id=${encodeURIComponent(selectedEmail.provider_message_id)}&needs_response=false`,
         { method: 'PATCH' }
       );
 
@@ -571,7 +569,7 @@ function App() {
     setMovingEmail(true);
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/emails/${selectedEmail.provider_message_id}/move?new_thread_id=${encodeURIComponent(moveThreadTarget)}`,
+        `/api/emails/move?provider_message_id=${encodeURIComponent(selectedEmail.provider_message_id)}&new_thread_id=${encodeURIComponent(moveThreadTarget)}`,
         { method: 'PATCH' }
       );
 
@@ -596,7 +594,7 @@ function App() {
     setSavingCustomerNote(true);
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/customers/${encodeURIComponent(selectedCustomer)}/note?note_text=${encodeURIComponent(customerNote)}`,
+        `/api/customers/note?email_address=${encodeURIComponent(selectedCustomer)}&note_text=${encodeURIComponent(customerNote)}`,
         { method: 'PATCH' }
       );
 

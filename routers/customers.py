@@ -16,7 +16,7 @@ def get_customers(db: Session = Depends(get_db)):
     return customers
 
 
-@router.get("/{email_address}/entries", response_model=list[CourseEntryReply])
+@router.get("/entries", response_model=list[CourseEntryReply])
 def get_customer_entries(email_address: str, db: Session = Depends(get_db)):
     entries = customer_service.get_customer_entries(db, email_address)
 
@@ -27,7 +27,7 @@ def get_customer_entries(email_address: str, db: Session = Depends(get_db)):
 
 
 
-@router.get("/{email_address}/emails", response_model=list[EmailMessageReply])
+@router.get("/emails", response_model=list[EmailMessageReply])
 def get_customer_messages(email_address: str, db: Session = Depends(get_db)):
     email_messages = customer_service.get_customer_messages(db, email_address)
 
@@ -37,7 +37,7 @@ def get_customer_messages(email_address: str, db: Session = Depends(get_db)):
     return email_messages
 
 
-@router.patch("/{email_address}/note", response_model=CustomerReply)
+@router.patch("/note", response_model=CustomerReply)
 def patch_customer_note(email_address: str, note_text: str, db: Session = Depends(get_db)):
     customer = customer_service.add_customer_note(db, email_address, note_text)
 
