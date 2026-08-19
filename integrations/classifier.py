@@ -1,5 +1,9 @@
 import re
 from datetime import datetime
+from openai import OpenAI
+import os
+from pydantic import BaseModel
+from logger import logger
 
 class EmailClassifier:
     def __init__(self, course_names: list[str]):
@@ -64,27 +68,59 @@ def strip_body(body_text: str) -> str:
     return '\n'.join(filtered_lines)
 
 
+client = OpenAI()
+
+
+class BooleanResponse(BaseModel):
+    result: bool
+
 def AI_analysis(subject: str, body: str, sender: str) -> bool:
-    """
-    Classifies whether an email needs a response using local LLM.
-    """
+    system_prompt = """Jesteś systemem triage dla działu obsługi klienta. 
+Przeanalizuj, czy otrzymana wiadomość wymaga odpowiedzi z naszej strony. 
+Jeśli nadawca pyta o informacje, wyraża zainteresowanie ofertą lub kursem, zadaje pytanie lub oczekuje odpowiedzi, zwróć True. W przeciwnym razie zwróć False.
+Zwróć TYLKO słowo True lub False. Nie podawaj żadnego wyjaśnienia.
 
-    prompt = f"""You are a customer support triage system. 
-Analyze if the incoming message requires a reply from our side. 
-If the sender is asking for information, expressing interest in an offer/course, asking a question, or expecting an answer, output True. Otherwise output False.
-Output ONLY the word True or False. Do not provide any explanation.
-
-Examples:
+Przykłady:
 - "Jestem zainteresowana kursem. Czy mogę prosić o szczegóły." -> True
 - "Dziękuję za informacje. Muszę potwierdzić czy cena jest akceptowalna." -> False
 - "Kiedy rusza kolejna edycja?" -> True
 - "Proszę o dodatkowe informacje" -> True
+- "Proszę wpisać mnie na listę" -> False"""
 
-Email Sender: {sender}
-Email Subject: {subject}
-Email Body:
+    user_prompt = f"""Nadawca e-maila: {sender}
+Temat e-maila: {subject}
+Treść e-maila:
 {body}
 
-Does this email require a response? Output ONLY True or False:"""
+Czy ten e-mail wymaga odpowiedzi? Odpowiedz TYLKO True lub False:"""
 
-    return True
+    try:
+        response = client.beta.chat.completions.parse(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format=BooleanResponse,
+        )
+        return response.choices[0].message.parsed.result
+
+    except Exception as e:
+        logger.error(f"AI analysis error: {e}")
+        return True
+
+
+# if __name__ == "__main__":
+#     result = AI_analysis("Nieobecność", """Dzień dobry,
+# W dniach 10.07-14.07.2026 r. jestem nieobecna w pracy. Na otrzymane wiadomości odpowiem niezwłocznie po powrocie.
+
+# Gdzie powinnam zaparkować. Czekam na tą informację niezwłocznie
+
+# Pozdrawiam serdecznie
+# Joanna Żak
+# Centrum Doskonałości Sztucznej Inteligencji
+# Akademia Górniczo-Hutnicza im. Stanisława Staszica w Krakowie
+# Al. Mickiewicza 30, 30-059 Kraków
+# paw. C6, pok. 412
+# tel. 12 617 55 23""","aleksy.zalenski@gmail.com")
+#     print(result)

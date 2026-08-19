@@ -52,16 +52,20 @@ def import_courses(db: Session = Depends(get_db)):
     return new_courses
 
 
-@router.post("/send", response_model=str)
+@router.post("/send")
 def send(payload: EmailSendRequest):
-    send_status = integration_service.send_customer_email(
+    success = integration_service.send_customer_email(
         recipient_email=payload.recipient_email,
         subject=payload.subject,
         body=payload.body,
         reply_message_id=payload.reply_message_id,
         add_html=payload.should_add_html
-        )
+    )
     
-    if send_status != "OK":
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=status)
-    return send_status
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Error while sending Email"
+        )
+        
+    return {"status": "success", "message": "Email sent successfully"}

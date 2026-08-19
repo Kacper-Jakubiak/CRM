@@ -8,3 +8,4 @@ python-dotenv
 jinja2
 dotenv
 requests
+openai

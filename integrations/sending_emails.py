@@ -45,7 +45,7 @@ def send_email(
     body: str,
     reply_message_id: str | None,
     add_html: bool
-) -> str:
+) -> bool:
     """Sends an email using SMTP with SSL, supporting optional reply threading and HTML."""
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -61,23 +61,20 @@ def send_email(
     if add_html:
         template = Template(HTML_TEMPLATE)
         html_content = template.render(message_body=body)
-        
         msg.attach(MIMEText(html_content, "html"))
 
-    # print(msg.as_string())
-    # return "OK"
-
     try:
+        logger.info(f"Connecting to SMTP server {SMTP_SERVER}:{SMTP_PORT}...")
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
-            print(f"Successfully sent email to {recipient_email}")
-            return "OK"
+            logger.info(f"Successfully sent email to {recipient_email}")
+            return True
             
     except Exception as e:
-        error_string = f"Failed to send email. Error: {e}"
-        print(error_string)
-        return error_string
+        error_string = f"Failed to send email to {recipient_email}. Error: {e}"
+        logger.error(error_string)
+        return False
 
 
 if __name__ == "__main__":
