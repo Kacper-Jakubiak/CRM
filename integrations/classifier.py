@@ -35,7 +35,7 @@ def check_course_names(course_names: list[str], process_result: dict) -> list[st
   return found_courses
 
 
-def extract_course_details(text: str) -> tuple[str, str, date]
+def extract_course_details(text: str) -> tuple[str, str, date]:
     lines = [line.strip() for line in text.split('\n') if line.strip()]
 
     date_match = re.search(r'Termin:\s*(\d{2}\.\d{2}\.\d{4})', text)
