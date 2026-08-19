@@ -1,31 +1,29 @@
 import re
 from datetime import datetime, date
 from openai import OpenAI
-import os
 from pydantic import BaseModel
+from schemas import ProcessedEmail
 from logger import logger
 
 class EmailClassifier:
     def __init__(self, course_names: list[str]):
         self.course_names = course_names
 
-    def classify_category(self, process_result: dict[str, str]) -> tuple[str, bool]:
-        category = "_".join(check_course_names(self.course_names, process_result)).lower() or "other"
+    def classify_category(self, process_result: ProcessedEmail) -> tuple[str, bool]:
+        stripped_body_text = strip_body(process_result.body)
 
-        stripped_body_text = strip_body(process_result["body"])
+        found_names = check_course_names(self.course_names, process_result.subject, stripped_body_text)
+        category = "_".join(found_names).lower() or "other"
 
         if '?' in stripped_body_text:
            needs_response = True
         else:
-           needs_response = AI_analysis(subject=process_result["subject"], body=stripped_body_text, sender=process_result["customer_email"])       
+           needs_response = AI_analysis(subject=process_result.subject, body=stripped_body_text, sender=process_result.customer_email)       
             
         return category, needs_response
     
 
-def check_course_names(course_names: list[str], process_result: dict) -> list[str]:
-  subject = process_result["subject"].lower()
-  body = process_result["body"].lower()
-
+def check_course_names(course_names: list[str], subject: str, body: str) -> list[str]:
   found_courses = []
   for course in course_names:
     course_lower = course.lower()
