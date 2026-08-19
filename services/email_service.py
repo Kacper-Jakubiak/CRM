@@ -6,6 +6,8 @@ from db import EmailMessage, Thread
 from services.customer_service import add_customer
 from logger import logger
 
+from schemas import EmailIngestItem
+
 
 def get_emails(db: Session) -> list[EmailMessage]:
     try:
@@ -32,14 +34,14 @@ def get_thread_messages(db: Session, thread_id: int) -> list[EmailMessage] | Non
         raise
 
 
-def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailMessage]:
+def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[EmailMessage]:
     ingested_messages = []
     customer_cache = {}
     batch_thread_map = {}
 
     try:
         for email_data in emails:
-            provider_message_id = email_data["provider_message_id"]
+            provider_message_id = email_data.provider_message_id
 
             existing_message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
             if existing_message:
@@ -47,8 +49,8 @@ def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailM
                 logger.info(f"Skipping duplicate message with provider_message_id '{provider_message_id}'.")
                 continue
 
-            customer_email = email_data["customer_email"]
-            parent_message_provider_id = email_data.get("parent_message_provider_id")
+            customer_email = email_data.customer_email
+            parent_message_provider_id = email_data.parent_message_provider_id
 
             thread_id = None
             if parent_message_provider_id:
@@ -70,7 +72,7 @@ def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailM
             if customer_email in customer_cache:
                 customer_id = customer_cache[customer_email]
             else:
-                customer = add_customer(db, email_data["customer_name"], customer_email)
+                customer = add_customer(db, email_data.customer_name, customer_email)
                 customer_id = customer.id
                 customer_cache[customer_email] = customer_id
 
@@ -78,11 +80,11 @@ def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailM
                 customer_id=customer_id,
                 provider_message_id=provider_message_id,
                 sender=customer_email,
-                subject=email_data["subject"],
-                body=email_data["body"],
-                sent_at=datetime.fromisoformat(email_data["sent_at"]),
-                needs_response=email_data["needs_response"],
-                category=email_data["category"],
+                subject=email_data.subject,
+                body=email_data.body,
+                sent_at=email_data.sent_at,
+                needs_response=email_data.needs_response,
+                category=email_data.category,
                 thread_id=thread_id
             )
 
@@ -96,11 +98,11 @@ def ingest_email_batch(db: Session, emails: list[dict[str, str]]) -> list[EmailM
 
         logger.info(f"Successfully ingested batch of {len(ingested_messages)} email messages.")
         return ingested_messages
-    except (SQLAlchemyError, KeyError, ValueError) as e:
+        
+    except (SQLAlchemyError, ValueError) as e:
         db.rollback()
         logger.error(f"Failed to ingest email batch: {e}", exc_info=True)
         raise
-
 
 def update_email_status(db: Session, provider_message_id: str, needs_response: bool) -> EmailMessage | None:
     try:

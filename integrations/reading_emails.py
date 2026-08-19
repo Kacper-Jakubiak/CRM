@@ -4,6 +4,7 @@ from integrations.classifier import EmailClassifier, extract_course_details
 from dotenv import load_dotenv
 import imaplib
 import os
+from schemas import CourseEntryRequest, EmailIngestItem
 from logger import logger
 
 load_dotenv()
@@ -46,6 +47,8 @@ def find_parent(mail: imaplib.IMAP4_SSL, references: list[str]) -> str | None:
 
     return None
 
+    
+
 
 def fetch_email_ids(mail, search_criteria):
     logger.info(f"Using IMAP search criteria: {search_criteria}")
@@ -68,7 +71,7 @@ def fetch_email_ids(mail, search_criteria):
         return None
 
 
-def process_single_email(mail, e_id, email_classifier) -> tuple[dict | None, dict | None]:
+def process_single_email(mail, e_id, email_classifier) -> tuple[CourseEntryRequest | None, EmailIngestItem | None]:
     e_id_str = e_id.decode()
     try:
         status, msg_data = mail.fetch(e_id, 'BODY.PEEK[]')
@@ -81,36 +84,42 @@ def process_single_email(mail, e_id, email_classifier) -> tuple[dict | None, dic
             logger.error(f"Failed to process email with ID {e_id_str}: status {status}")
             return None, None
 
-        if processed_email["sent_to"].lower() != IMAP_USER.lower():
+        if processed_email.sent_to.lower() != IMAP_USER.lower():
             logger.debug(f"Email with ID {e_id_str} was not sent to expected address. ")
             return None, None
 
-        if processed_email["customer_email"].lower() == CONFIRMATION_EMAIL.lower():
+        email_payload = None
+        course_payload = None
+
+        if processed_email.customer_email.lower() == CONFIRMATION_EMAIL.lower():
             logger.debug(f"Processing confirmation email ID {e_id_str} from '{CONFIRMATION_EMAIL}'.")
-            course_details = extract_course_details(processed_email["body"])
-            email_payload = None
+            course_details = extract_course_details(processed_email.body)
             
             if course_details:
                 logger.debug(f"Successfully extracted course details for email ID {e_id_str}.")
-                course_payload = course_details | {
-                    "sent_at": processed_email["sent_at"],
-                    "customer_name": processed_email["customer_name"]
-                }
+                c_name, c_email, c_date = course_details
+                course_payload = CourseEntryRequest(
+                    customer_email= c_email,
+                    course_name= c_name,
+                    course_date= c_date,
+                    sent_at= processed_email.sent_at,
+                    customer_name= processed_email.customer_name
+                )
             else:
                 logger.warning(f"Failed to extract course details from confirmation email ID {e_id_str}.")
-                course_payload = None
+
         else:
-            logger.debug(f"Classifying standard email ID {e_id_str} from '{processed_email['customer_email']}'.")
+            logger.debug(f"Classifying standard email ID {e_id_str} from '{processed_email.customer_email}'.")
             category, needs_response = email_classifier.classify_category(processed_email)
             parent_id = find_parent(mail, references)
-            
-            email_payload = processed_email | {"category": category, "needs_respnonse": needs_response} | {
-                "parent_message_provider_id": parent_id
-            }
-            logger.debug(
-                f"{category = }, {needs_response =}"
+
+            email_payload = EmailIngestItem(
+                **processed_email.model_dump(),
+                needs_response=needs_response,
+                category=category,
+                parent_message_provider_id=parent_id
             )
-            course_payload = None
+            logger.debug(f"{category = }, {needs_response =}")
 
         return email_payload, course_payload
     except Exception as e:
@@ -118,7 +127,7 @@ def process_single_email(mail, e_id, email_classifier) -> tuple[dict | None, dic
         return None, None
 
 
-def process_new_emails(seatch_criteria, course_names) -> tuple[list, list] | None:
+def process_new_emails(seatch_criteria, course_names) -> tuple[list[CourseEntryRequest], list[EmailIngestItem]] | None:
     logger.info("Connecting to IMAP server for processing new emails...")
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)

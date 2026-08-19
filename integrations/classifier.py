@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, date
 from openai import OpenAI
 import os
 from pydantic import BaseModel
@@ -35,7 +35,7 @@ def check_course_names(course_names: list[str], process_result: dict) -> list[st
   return found_courses
 
 
-def extract_course_details(text: str) -> dict[str, str]:
+def extract_course_details(text: str) -> tuple[str, str, date]
     lines = [line.strip() for line in text.split('\n') if line.strip()]
 
     date_match = re.search(r'Termin:\s*(\d{2}\.\d{2}\.\d{4})', text)
@@ -48,13 +48,8 @@ def extract_course_details(text: str) -> dict[str, str]:
     normalized_course_name = re.sub(r'\s+', ' ', lines[1]).strip()
 
     date_obj = datetime.strptime(date_match.group(1), "%d.%m.%Y")
-    normalized_date = date_obj.date().isoformat()
 
-    return {
-        "course_name": normalized_course_name,
-        "course_date": normalized_date,
-        "customer_email": email_match.group(1)
-    }
+    return normalized_course_name, email_match.group(1), date_obj.date()
     
 
 def strip_body(body_text: str) -> str:

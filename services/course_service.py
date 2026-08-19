@@ -76,7 +76,9 @@ def add_course_entries_batch(db: Session, entries: list[CourseEntryRequest]) -> 
 
             customer = customers_map.get(item.customer_email)
             if not customer:
-                customer = Customer(email=item.customer_email, name=item.course_name)
+                customer = Customer(email=item.customer_email)
+                if item.customer_name:
+                    customer.name = item.customer_name
                 db.add(customer)
                 db.flush()
                 customers_map[item.customer_email] = customer

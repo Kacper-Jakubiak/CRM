@@ -20,6 +20,7 @@ class CourseEntryRequest(BaseModel):
     course_name: str
     course_date: datetime
     sent_at: datetime
+    customer_name: Optional[str]
 
 class CourseEntryBatchRequest(BaseModel):
     entries: list[CourseEntryRequest]
@@ -80,3 +81,18 @@ class EmailMessageResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ProcessedEmail(BaseModel):
+    provider_message_id: str
+    customer_email: str
+    sent_to: str
+    subject: str
+    body: str
+    sent_at: datetime
+    customer_name: str
+
+
+class EmailIngestItem(ProcessedEmail):
+    needs_response: bool
+    category: str
+    parent_message_provider_id: Optional[str] = None

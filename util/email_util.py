@@ -1,8 +1,9 @@
 from email.policy import default
 from email.utils import parseaddr
 import email
+from schemas import ProcessedEmail
 
-def process_email(msg_data) -> tuple[str, dict[str, str], list[str]]:
+def process_email(msg_data) -> tuple[str, ProcessedEmail, list[str]]:
     email_bytes = None
     for response_part in msg_data:
         if isinstance(response_part, tuple):
@@ -42,15 +43,17 @@ def process_email(msg_data) -> tuple[str, dict[str, str], list[str]]:
     if raw_refs:
         references = [ref.strip("<> ") for ref in raw_refs.split() if ref.strip("<> ")]
 
-    return "OK", {
-        "provider_message_id": provider_message_id,
-        "customer_email": customer_email,
-        "sent_to": sent_to,
-        "subject": subject,
-        "body": body,
-        "sent_at": sent_at,
-        "customer_name": customer_name
-    }, references
+    email_instance = ProcessedEmail(
+        provider_message_id=provider_message_id,
+        customer_email=customer_email,
+        sent_to=sent_to,
+        subject=subject,
+        body=body,
+        sent_at=sent_at,
+        customer_name=customer_name
+    )
+
+    return "OK", email_instance, references
 
 
 def extract_message_id(msg_data) -> str:
