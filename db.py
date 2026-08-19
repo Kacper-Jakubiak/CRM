@@ -94,3 +94,7 @@ class Thread(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     messages: Mapped[List["EmailMessage"]] = relationship("EmailMessage", back_populates="thread", cascade="all, delete-orphan")
+
+if __name__ == "__main__":
+    Base.metadata.create_all(bind=engine)
+    print("created")
