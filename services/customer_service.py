@@ -3,11 +3,11 @@ from sqlalchemy import desc
 from sqlalchemy.exc import SQLAlchemyError
 
 from util.email_util import extract_domain
-from db import Customer, CourseEntry, EmailMessage, Company
+from db import Customer, CourseEntry, EmailMessage
 from logger import logger
 
 def _get_customer_by_email(db: Session, email_address: str) -> Customer | None:
-    return db.query(Customer).options(joinedload(Customer.company)).filter_by(email=email_address).first()
+    return db.query(Customer).filter_by(email=email_address).first()
 
 def add_customer(db: Session, name: str, email_address: str) -> Customer:
     try:
@@ -17,13 +17,8 @@ def add_customer(db: Session, name: str, email_address: str) -> Customer:
             return customer
 
         domain = extract_domain(email_address)
-        company = db.query(Company).filter_by(domain=domain).first()
-        if not company:
-            company = Company(domain=domain)
-            db.add(company)
-            db.flush()
 
-        customer = Customer(name=name, email=email_address, company_id=company.id)
+        customer = Customer(email=email_address, name=name, company_domain=domain)
         db.add(customer)
         db.commit()
         db.refresh(customer)
@@ -34,28 +29,6 @@ def add_customer(db: Session, name: str, email_address: str) -> Customer:
         db.rollback()
         logger.error(f"Failed to add customer '{email_address}': {e}", exc_info=True)
         raise
-
-
-def add_customer_no_commit(db: Session, name: str, email_address: str) -> Customer:
-    customer = _get_customer_by_email(db, email_address)
-    if customer:
-        logger.debug(f"Customer '{email_address}' already exists.")
-        return customer
-
-    domain = extract_domain(email_address)
-    company = db.query(Company).filter_by(domain=domain).first()
-    if not company:
-        company = Company(domain=domain)
-        db.add(company)
-        db.flush()
-
-    customer = Customer(name=name, email=email_address, company_id=company.id)
-    db.add(customer)
-    db.flush()
-    db.refresh(customer)
-
-    logger.debug(f"Successfully added customer '{email_address}'.")
-    return customer
 
 def add_customer_note(db: Session, email_address: str, note_text: str) -> Customer | None:
     try:
@@ -77,7 +50,7 @@ def add_customer_note(db: Session, email_address: str, note_text: str) -> Custom
 
 def get_customers(db: Session) -> list[Customer]:
     try:
-        customers = db.query(Customer).options(joinedload(Customer.company)).all()
+        customers = db.query(Customer).all()
         logger.info(f"Retrieved {len(customers)} customers.")
         return customers
     except SQLAlchemyError as e:
@@ -93,8 +66,8 @@ def get_customer_entries(db: Session, email_address: str) -> list[CourseEntry] |
 
         course_entries = (
             db.query(CourseEntry)
-            .options(joinedload(CourseEntry.course), joinedload(CourseEntry.customer))
-            .filter(CourseEntry.customer_id == customer.id)
+            .options(joinedload(CourseEntry.course))
+            .filter(CourseEntry.customer_email == customer.email)
             .order_by(desc(CourseEntry.course_date))
             .all()
         )
@@ -114,7 +87,7 @@ def get_customer_messages(db: Session, email_address: str) -> list[EmailMessage]
 
         messages = (
             db.query(EmailMessage)
-            .filter(EmailMessage.customer_id == customer.id)
+            .filter(EmailMessage.customer_email == customer.email)
             .order_by(EmailMessage.sent_at.desc())
             .all()
         )

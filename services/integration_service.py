@@ -41,7 +41,7 @@ def pull_new_emails(db: Session) -> tuple[int, int]:
             logger.error("Failed to process new emails from IMAP.")
             raise RuntimeError("Email fetching and processing failed.")
             
-        email_payloads, course_payloads = result
+        course_payloads, email_payloads = result
 
         total_ingested_emails = 0
         for email_chunk in chunk_list(email_payloads, BATCH_SIZE_LIMIT):

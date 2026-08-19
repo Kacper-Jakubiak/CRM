@@ -47,7 +47,7 @@ def find_parent(mail: imaplib.IMAP4_SSL, references: list[str]) -> str | None:
 
     return None
 
-    
+   
 
 
 def fetch_email_ids(mail, search_criteria):
@@ -79,13 +79,14 @@ def process_single_email(mail, e_id, email_classifier) -> tuple[CourseEntryReque
             logger.error(f"Failed to fetch email with ID {e_id_str}: status {status}")
             return None, None
 
-        status, processed_email, references = process_email(msg_data)
-        if status != "OK":
-            logger.error(f"Failed to process email with ID {e_id_str}: status {status}")
+        try:
+            processed_email, references = process_email(msg_data)
+        except Exception as err:
+            logger.error(f"Failed to process email with ID {e_id_str}: {err}")
             return None, None
-
+                    
         if processed_email.sent_to.lower() != IMAP_USER.lower():
-            logger.debug(f"Email with ID {e_id_str} was not sent to expected address. ")
+            logger.warning(f"Email with ID {e_id_str} was not sent to expected address. ")
             return None, None
 
         email_payload = None
@@ -121,7 +122,7 @@ def process_single_email(mail, e_id, email_classifier) -> tuple[CourseEntryReque
             )
             logger.debug(f"{category = }, {needs_response =}")
 
-        return email_payload, course_payload
+        return course_payload, email_payload
     except Exception as e:
         logger.error(f"Unexpected error processing email ID {e_id_str}: {e}", exc_info=True)
         return None, None
@@ -155,12 +156,12 @@ def process_new_emails(seatch_criteria, course_names) -> tuple[list[CourseEntryR
             mail.logout()
             return None
 
-        email_payloads = []
-        course_payloads = []
+        email_payloads: list[EmailIngestItem] = []
+        course_payloads: list[CourseEntryRequest] = []
 
         for idx, e_id in enumerate(email_ids):
             logger.debug(f"Processing email {e_id.decode()} ({idx+1}/{len(email_ids)})...")
-            email_payload, course_payload = process_single_email(mail, e_id, email_classifier)
+            course_payload, email_payload = process_single_email(mail, e_id, email_classifier)
 
             if email_payload:
                 email_payloads.append(email_payload)
@@ -169,7 +170,7 @@ def process_new_emails(seatch_criteria, course_names) -> tuple[list[CourseEntryR
 
         logger.info(f"Finished processing batch. Collected {len(email_payloads)} standard payloads and {len(course_payloads)} course payloads.")
         mail.logout()
-        return email_payloads, course_payloads
+        return course_payloads, email_payloads
     
     except Exception as e:
         logger.error(f"Critical error during email batch processing: {e}", exc_info=True)
@@ -178,3 +179,7 @@ def process_new_emails(seatch_criteria, course_names) -> tuple[list[CourseEntryR
         except Exception:
             pass
         return None
+
+
+if __name__ == "__main__":
+    process_new_emails("ALL", [])

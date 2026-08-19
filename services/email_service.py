@@ -1,9 +1,9 @@
-from datetime import datetime
+from sqlalchemy import insert
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from db import EmailMessage, Thread
-from services.customer_service import add_customer_no_commit
+from db import EmailMessage, Thread, Customer
+from util.email_util import extract_domain
 from logger import logger
 
 from schemas import EmailIngestItem
@@ -33,33 +33,58 @@ def get_thread_messages(db: Session, thread_id: int) -> list[EmailMessage] | Non
         logger.error(f"Failed to fetch messages for thread_id '{thread_id}': {e}", exc_info=True)
         raise
 
-
 def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[EmailMessage]:
-    ingested_messages = []
-    customer_cache = {}
-    batch_thread_map = {}
+    if not emails:
+        return []
 
     try:
+        batch_emails = {item.customer_email for item in emails}
+        batch_email_ids = {item.provider_message_id for item in emails}
+        parent_ids = {item.parent_message_provider_id for item in emails if item.parent_message_provider_id}
+        
+        all_needed_provider_ids = batch_email_ids.union(parent_ids)
+
+        existing_customers = db.query(Customer).filter(Customer.email.in_(batch_emails)).all()
+        existing_emails = {c.email for c in existing_customers}
+        missing_emails = batch_emails - existing_emails
+
+        new_customers_data = []
+        seen_in_batch = set()
+
+        for email_data in emails:
+            email = email_data.customer_email
+            if email in missing_emails and email not in seen_in_batch:
+                seen_in_batch.add(email)
+                new_customers_data.append({
+                    "email": email,
+                    "name": email_data.customer_name,
+                    "company_domain": extract_domain(email),
+                })
+
+        if new_customers_data:
+            db.execute(insert(Customer), new_customers_data)
+
+        existing_messages = db.query(EmailMessage).filter(
+            EmailMessage.provider_message_id.in_(all_needed_provider_ids)
+        ).all()
+        
+        message_map = {m.provider_message_id: m for m in existing_messages}
+        batch_thread_map = {pid: m.thread_id for pid, m in message_map.items()}
+
+        ingested_messages = []
+
         for email_data in emails:
             provider_message_id = email_data.provider_message_id
 
-            existing_message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
-            if existing_message:
-                batch_thread_map[provider_message_id] = existing_message.thread_id
+            if provider_message_id in message_map:
                 logger.info(f"Skipping duplicate message with provider_message_id '{provider_message_id}'.")
                 continue
 
-            customer_email = email_data.customer_email
-            parent_message_provider_id = email_data.parent_message_provider_id
-
+            parent_id = email_data.parent_message_provider_id
             thread_id = None
-            if parent_message_provider_id:
-                if parent_message_provider_id in batch_thread_map:
-                    thread_id = batch_thread_map[parent_message_provider_id]
-                else:
-                    parent = db.query(EmailMessage).filter_by(provider_message_id=parent_message_provider_id).first()
-                    if parent:
-                        thread_id = parent.thread_id
+
+            if parent_id:
+                thread_id = batch_thread_map.get(parent_id)
 
             if thread_id is None:
                 thread = Thread()
@@ -69,17 +94,10 @@ def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[Email
 
             batch_thread_map[provider_message_id] = thread_id
 
-            if customer_email in customer_cache:
-                customer_id = customer_cache[customer_email]
-            else:
-                customer = add_customer_no_commit(db, email_data.customer_name, customer_email)
-                customer_id = customer.id
-                customer_cache[customer_email] = customer_id
-
             message = EmailMessage(
-                customer_id=customer_id,
                 provider_message_id=provider_message_id,
-                sender=customer_email,
+                customer_email=email_data.customer_email,
+                sender=email_data.customer_email,
                 subject=email_data.subject,
                 body=email_data.body,
                 sent_at=email_data.sent_at,
@@ -90,6 +108,7 @@ def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[Email
 
             db.add(message)
             ingested_messages.append(message)
+            message_map[provider_message_id] = message
 
         db.commit()
 
@@ -98,12 +117,12 @@ def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[Email
 
         logger.info(f"Successfully ingested batch of {len(ingested_messages)} email messages.")
         return ingested_messages
-        
+
     except (SQLAlchemyError, ValueError) as e:
         db.rollback()
         logger.error(f"Failed to ingest email batch: {e}", exc_info=True)
         raise
-
+      
 def update_email_status(db: Session, provider_message_id: str, needs_response: bool) -> EmailMessage | None:
     try:
         message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()

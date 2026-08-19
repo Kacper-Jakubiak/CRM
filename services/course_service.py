@@ -1,8 +1,9 @@
-from datetime import datetime
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from sqlalchemy.exc import SQLAlchemyError
 from schemas import CourseEntryRequest
+from util.email_util import extract_domain
+from sqlalchemy import insert
 
 from db import Course, CourseEntry, Customer, EmailMessage
 from logger import logger
@@ -46,7 +47,7 @@ def get_all_entries(db: Session) -> list[CourseEntry]:
     try:
         entries = (
             db.query(CourseEntry)
-            .options(joinedload(CourseEntry.course), joinedload(CourseEntry.customer))
+            .options(joinedload(CourseEntry.course))
             .order_by(desc(CourseEntry.course_date))
             .all()
         )
@@ -55,6 +56,7 @@ def get_all_entries(db: Session) -> list[CourseEntry]:
     except SQLAlchemyError as e:
         logger.error(f"Failed to retrieve course entries: {e}", exc_info=True)
         raise
+
 
 def add_course_entries_batch(db: Session, entries: list[CourseEntryRequest]) -> list[CourseEntry]:
     if not entries:
@@ -67,6 +69,24 @@ def add_course_entries_batch(db: Session, entries: list[CourseEntryRequest]) -> 
         customer_emails = {item.customer_email for item in entries}
         customers_map = {c.email: c for c in db.query(Customer).filter(Customer.email.in_(customer_emails)).all()}
 
+        missing_emails = customer_emails - customers_map.keys()
+        new_customers_data = []
+        seen_in_batch = set()
+
+        for item in entries:
+            email = item.customer_email
+            if email in missing_emails and email not in seen_in_batch:
+                seen_in_batch.add(email)
+                new_customers_data.append({
+                    "email": email,
+                    "name": item.customer_name if item.customer_name else "",
+                    "company_domain": extract_domain(email),
+                })
+
+        if new_customers_data:
+            db.execute(insert(Customer), new_customers_data)
+            
+
         inserted_entries = []
         for item in entries:
             course = courses_map.get(item.course_name)
@@ -74,17 +94,8 @@ def add_course_entries_batch(db: Session, entries: list[CourseEntryRequest]) -> 
                 logger.warning(f"Skipping entry: Course '{item.course_name}' not found.")
                 continue
 
-            customer = customers_map.get(item.customer_email)
-            if not customer:
-                customer = Customer(email=item.customer_email)
-                if item.customer_name:
-                    customer.name = item.customer_name
-                db.add(customer)
-                db.flush()
-                customers_map[item.customer_email] = customer
-
             course_entry = CourseEntry(
-                customer_id=customer.id,
+                customer_email=item.customer_email,
                 course_id=course.id,
                 course_date=item.course_date,
                 sent_at=item.sent_at
@@ -118,7 +129,7 @@ def get_course_entries(db: Session, course_name: str) -> list[CourseEntry] | Non
 
         entries = (
             db.query(CourseEntry)
-            .options(joinedload(CourseEntry.course), joinedload(CourseEntry.customer))
+            .options(joinedload(CourseEntry.course))
             .filter_by(course_id=course.id)
             .order_by(desc(CourseEntry.course_date))
             .all()
@@ -139,7 +150,6 @@ def get_course_emails(db: Session, course_name: str) -> list[EmailMessage] | Non
         search_pattern = f"%{course.name}%"
         emails = (
             db.query(EmailMessage)
-            .options(joinedload(EmailMessage.customer))
             .filter(
                 (EmailMessage.subject.ilike(search_pattern)) | 
                 (EmailMessage.body.ilike(search_pattern)) |

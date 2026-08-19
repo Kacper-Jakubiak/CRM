@@ -8,6 +8,12 @@ from logger import logger
 class EmailClassifier:
     def __init__(self, course_names: list[str]):
         self.course_names = course_names
+        try:
+          self.client = OpenAI()
+        except Exception as e:
+          logger.warning(f"Failed to log into OpenAI: {e}")
+          logger.info("AI classification skipped")
+          self.client = None
 
     def classify_category(self, process_result: ProcessedEmail) -> tuple[str, bool]:
         stripped_body_text = strip_body(process_result.body)
@@ -17,8 +23,10 @@ class EmailClassifier:
 
         if '?' in stripped_body_text:
            needs_response = True
+        elif self.client is None:
+           needs_response = True
         else:
-           needs_response = False#AI_analysis(subject=process_result.subject, body=stripped_body_text, sender=process_result.customer_email)       
+           needs_response = AI_analysis(self.client, subject=process_result.subject, body=stripped_body_text, sender=process_result.customer_email)       
             
         return category, needs_response
     
@@ -61,13 +69,10 @@ def strip_body(body_text: str) -> str:
     return '\n'.join(filtered_lines)
 
 
-client = OpenAI()
-
-
 class BooleanResponse(BaseModel):
     result: bool
 
-def AI_analysis(subject: str, body: str, sender: str) -> bool:
+def AI_analysis(client, subject: str, body: str, sender: str) -> bool:
     system_prompt = """Jesteś systemem triage dla działu obsługi klienta. 
 Przeanalizuj, czy otrzymana wiadomość wymaga odpowiedzi z naszej strony. 
 Jeśli nadawca pyta o informacje, wyraża zainteresowanie ofertą lub kursem, zadaje pytanie lub oczekuje odpowiedzi, zwróć True. W przeciwnym razie zwróć False.
@@ -101,19 +106,3 @@ Czy ten e-mail wymaga odpowiedzi? Odpowiedz TYLKO True lub False:"""
     except Exception as e:
         logger.error(f"AI analysis error: {e}")
         return True
-
-
-# if __name__ == "__main__":
-#     result = AI_analysis("Nieobecność", """Dzień dobry,
-# W dniach 10.07-14.07.2026 r. jestem nieobecna w pracy. Na otrzymane wiadomości odpowiem niezwłocznie po powrocie.
-
-# Gdzie powinnam zaparkować. Czekam na tą informację niezwłocznie
-
-# Pozdrawiam serdecznie
-# Joanna Żak
-# Centrum Doskonałości Sztucznej Inteligencji
-# Akademia Górniczo-Hutnicza im. Stanisława Staszica w Krakowie
-# Al. Mickiewicza 30, 30-059 Kraków
-# paw. C6, pok. 412
-# tel. 12 617 55 23""","aleksy.zalenski@gmail.com")
-#     print(result)

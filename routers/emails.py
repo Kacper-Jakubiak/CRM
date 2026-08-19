@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from dependencies import get_db
-from schemas import EmailBatchIngestRequest, EmailMessageResponse
+from schemas import EmailMessageResponse
 from services import email_service
 
 router = APIRouter(
@@ -21,21 +21,6 @@ def list_emails(db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve emails"
-        )
-
-
-@router.post("/batch", status_code=status.HTTP_201_CREATED, response_model=list[EmailMessageResponse])
-def batch_ingest_emails(payload: EmailBatchIngestRequest, db: Session = Depends(get_db)):
-    try:
-        email_messages = email_service.ingest_email_batch(
-            db=db, 
-            emails=[message.model_dump() for message in payload.messages]
-        )
-        return email_messages
-    except (SQLAlchemyError, ValueError, KeyError):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to process email batch ingestion"
         )
 
 
