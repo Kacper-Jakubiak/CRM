@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from db import EmailMessage, Thread
-from services.customer_service import add_customer
+from services.customer_service import add_customer_no_commit
 from logger import logger
 
 from schemas import EmailIngestItem
@@ -72,7 +72,7 @@ def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[Email
             if customer_email in customer_cache:
                 customer_id = customer_cache[customer_email]
             else:
-                customer = add_customer(db, email_data.customer_name, customer_email)
+                customer = add_customer_no_commit(db, email_data.customer_name, customer_email)
                 customer_id = customer.id
                 customer_cache[customer_email] = customer_id
 

@@ -35,6 +35,28 @@ def add_customer(db: Session, name: str, email_address: str) -> Customer:
         logger.error(f"Failed to add customer '{email_address}': {e}", exc_info=True)
         raise
 
+
+def add_customer_no_commit(db: Session, name: str, email_address: str) -> Customer:
+    customer = _get_customer_by_email(db, email_address)
+    if customer:
+        logger.debug(f"Customer '{email_address}' already exists.")
+        return customer
+
+    domain = extract_domain(email_address)
+    company = db.query(Company).filter_by(domain=domain).first()
+    if not company:
+        company = Company(domain=domain)
+        db.add(company)
+        db.flush()
+
+    customer = Customer(name=name, email=email_address, company_id=company.id)
+    db.add(customer)
+    db.flush()
+    db.refresh(customer)
+
+    logger.debug(f"Successfully added customer '{email_address}'.")
+    return customer
+
 def add_customer_note(db: Session, email_address: str, note_text: str) -> Customer | None:
     try:
         customer = _get_customer_by_email(db, email_address)
