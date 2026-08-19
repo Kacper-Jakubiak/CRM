@@ -52,7 +52,6 @@ class EmailMessage(Base):
 
     provider_message_id: Mapped[str] = mapped_column(primary_key=True, index=True)
     customer_email: Mapped[int] = mapped_column(ForeignKey("customers.email"), index=True, nullable=False)
-    sender: Mapped[str] = mapped_column(nullable=False)
     subject: Mapped[str] = mapped_column(nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     sent_at: Mapped[datetime] = mapped_column(nullable=False)

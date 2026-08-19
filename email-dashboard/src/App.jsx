@@ -632,7 +632,7 @@ function App() {
       const email = (c.email || '').toLowerCase();
       const name = (c.name || '').toLowerCase();
       const note = (c.note || '').toLowerCase();
-      const company = (c.company_name || c.company_id ? String(c.company_id) : '').toLowerCase();
+      const company = (c.company_domain || '').toLowerCase();
       return email.includes(q) || name.includes(q) || note.includes(q) || company.includes(q);
     })
     .slice();
@@ -640,7 +640,7 @@ function App() {
 
   const customersByCompany = Object.entries(
     filteredCustomers.reduce((acc, c) => {
-      const key = c.company_name ?? 'No company';
+      const key = c.company_domain ?? 'No company';
       if (!acc[key]) acc[key] = [];
       acc[key].push(c);
       return acc;
@@ -859,8 +859,8 @@ function App() {
 
               {customerHistory.customer && (
                 <div className="customer-meta">
-                  {customerHistory.customer.company_name && (
-                    <div className="customer-company">Company: {customerHistory.customer.company_name}</div>
+                  {customerHistory.customer.company_domain && (
+                    <div className="customer-company">Company: {customerHistory.customer.company_domain}</div>
                   )}
                 </div>
               )}

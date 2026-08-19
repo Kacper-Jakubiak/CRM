@@ -86,7 +86,7 @@ def process_single_email(mail, e_id, email_classifier) -> tuple[CourseEntryReque
             return None, None
                     
         if processed_email.sent_to.lower() != IMAP_USER.lower():
-            logger.warning(f"Email with ID {e_id_str} was not sent to expected address. ")
+            logger.info(f"Email with ID {e_id_str} was not sent to expected address. ")
             return None, None
 
         email_payload = None

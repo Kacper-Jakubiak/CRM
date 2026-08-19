@@ -97,7 +97,6 @@ def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[Email
             message = EmailMessage(
                 provider_message_id=provider_message_id,
                 customer_email=email_data.customer_email,
-                sender=email_data.customer_email,
                 subject=email_data.subject,
                 body=email_data.body,
                 sent_at=email_data.sent_at,
