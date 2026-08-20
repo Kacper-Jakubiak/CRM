@@ -41,7 +41,7 @@ class CustomerResponse(BaseModel):
 
 
 class CourseEntryResponse(BaseModel):
-    id: int
+    provider_message_id: str
     customer_email: EmailStr
     course_id: int
     course_date: datetime
@@ -55,7 +55,6 @@ class CourseEntryResponse(BaseModel):
 class EmailMessageResponse(BaseModel):
     provider_message_id: str
     customer_email: EmailStr
-    sender: str
     subject: str
     body: str
     sent_at: datetime
