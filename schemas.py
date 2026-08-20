@@ -8,6 +8,7 @@ class CourseEntryRequest(BaseModel):
     course_date: date
     sent_at: datetime
     customer_name: Optional[str]
+    provider_message_id: str
 
 class CourseEntryBatchRequest(BaseModel):
     entries: list[CourseEntryRequest]

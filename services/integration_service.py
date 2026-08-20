@@ -1,9 +1,8 @@
 from integrations.reading_emails import process_new_emails
 from integrations.sending_emails import send_email
 from services import course_service
-from db import AppConfig
 from logger import logger
-from datetime import date
+from datetime import datetime
 from util.general import chunk_list
 from services import email_service, course_service
 from sqlalchemy.orm import Session
@@ -26,12 +25,13 @@ def pull_new_emails(db: Session) -> tuple[int, int]:
     Returns a tuple of (ingested_emails_count, ingested_courses_count).
     """
     try:
-        last_pull_config = db.get(AppConfig, "last_email_pull")
-        if last_pull_config and last_pull_config.value:
-            criteria = f"(SINCE {last_pull_config.value})"
-        else:
-            logger.warning("No previous email pull timestamp found. Fetching ALL emails.")
+        target_date = _get_search_date(db)
+        if target_date is None:
+            logger.warning("No previous pull timestamps found. Fetching ALL emails.")
             criteria = "ALL"
+        else:
+            since_date = target_date.strftime("%d-%b-%Y")
+            criteria = f'(SINCE "{since_date}")'
 
         courses = course_service.get_all_courses(db)
         names = [c.name for c in courses]
@@ -53,10 +53,7 @@ def pull_new_emails(db: Session) -> tuple[int, int]:
             entries = course_service.add_course_entries_batch(db, course_chunk)
             total_ingested_courses += len(entries)
 
-        
-        db.commit()
         logger.info(f"Successfully pulled and ingested {total_ingested_emails} emails and {total_ingested_courses} course entries.")
-        _update_last_pull_date(db)
 
         return total_ingested_emails, total_ingested_courses
 
@@ -66,17 +63,18 @@ def pull_new_emails(db: Session) -> tuple[int, int]:
         raise
 
 
+def _get_search_date(db: Session) -> datetime | None:
+    newest_message = email_service.get_newest_email(db)
+    newest_entry = course_service.get_newest_entry(db)
 
-def _update_last_pull_date(db):
-    today_str = date.today().strftime("%d-%b-%Y")
-      
-    config = db.get(AppConfig, "last_email_pull")
-    if not config:
-      config = AppConfig(key="last_email_pull", value=today_str)
-      db.add(config)
-    else:
-      config.value = today_str
-      
-    db.commit()
-    logger.info(f"Saved last_pull_date as {today_str}")
-    return
+    valid_dates = []
+    if newest_message:
+        valid_dates.append(newest_message.sent_at)
+        
+    if newest_entry:
+        valid_dates.append(newest_entry.sent_at)
+
+    if len(valid_dates) == 0:
+        return None
+
+    return max(valid_dates)

@@ -50,7 +50,7 @@ def find_parent(mail: imaplib.IMAP4_SSL, references: list[str]) -> str | None:
    
 
 
-def fetch_email_ids(mail, search_criteria):
+def fetch_email_ids(mail, search_criteria) -> list | None:
     logger.info(f"Using IMAP search criteria: {search_criteria}")
 
     try:
@@ -104,7 +104,8 @@ def process_single_email(mail, e_id, email_classifier) -> tuple[CourseEntryReque
                     course_name= c_name,
                     course_date= c_date,
                     sent_at= processed_email.sent_at,
-                    customer_name= processed_email.customer_name
+                    customer_name= processed_email.customer_name,
+                    provider_message_id=processed_email.provider_message_id
                 )
             else:
                 logger.warning(f"Failed to extract course details from confirmation email ID {e_id_str}.")
@@ -144,13 +145,14 @@ def process_new_emails(seatch_criteria, course_names) -> tuple[list[CourseEntryR
             mail.logout()
             return None
 
-        if not email_ids:
+        if len(email_ids) == 0:
             mail.logout()
             return [], []
 
         logger.info(f"Processing {len(email_ids)} matching emails...")
 
-        email_classifier = EmailClassifier(course_names)
+        use_ai = (seatch_criteria == "ALL")
+        email_classifier = EmailClassifier(course_names, use_ai)
         if not email_classifier:
             logger.error("Failed to initialize EmailClassifier.")
             mail.logout()

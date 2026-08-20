@@ -57,19 +57,26 @@ def get_all_entries(db: Session) -> list[CourseEntry]:
         logger.error(f"Failed to retrieve course entries: {e}", exc_info=True)
         raise
 
+def get_newest_entry(db: Session) -> CourseEntry | None:
+    try:
+        message = db.query(CourseEntry).order_by(CourseEntry.sent_at.desc()).first()
+        logger.info(f"Retrieved course entry message.")
+        return message
+    except SQLAlchemyError as e:
+        logger.error(f"Failed to retrieve entry: {e}", exc_info=True)
+        raise
 
 def add_course_entries_batch(db: Session, entries: list[CourseEntryRequest]) -> list[CourseEntry]:
     if not entries:
         return []
 
     try:
-        course_names = {item.course_name for item in entries}
-        courses_map = {c.name: c for c in db.query(Course).filter(Course.name.in_(course_names)).all()}
-
         customer_emails = {item.customer_email for item in entries}
-        customers_map = {c.email: c for c in db.query(Customer).filter(Customer.email.in_(customer_emails)).all()}
 
-        missing_emails = customer_emails - customers_map.keys()
+        existing_customers = db.query(Customer).filter(Customer.email.in_(customer_emails)).all()
+        existing_emails = {c.email for c in existing_customers}
+        missing_emails = customer_emails - existing_emails
+
         new_customers_data = []
         seen_in_batch = set()
 
@@ -86,35 +93,46 @@ def add_course_entries_batch(db: Session, entries: list[CourseEntryRequest]) -> 
         if new_customers_data:
             db.execute(insert(Customer), new_customers_data)
             
+        batch_entry_ids = {item.provider_message_id for item in entries}
+        existing_entries =  db.query(CourseEntry).filter(
+            CourseEntry.provider_message_id.in_(batch_entry_ids)
+        ).all()
+        entry_map = {e.provider_message_id: e for e in existing_entries}
+        course_names = {item.course_name for item in entries}
+        courses_map = {c.name: c for c in db.query(Course).filter(Course.name.in_(course_names)).all()}
 
-        inserted_entries = []
+        inserted_entries: list[CourseEntry] = []
+
         for item in entries:
+            provider_message_id = item.provider_message_id
+
+            if provider_message_id in entry_map:
+                logger.info(f"Skipping duplicate entry with provider_message_id '{provider_message_id}'.")
+                continue
+
             course = courses_map.get(item.course_name)
             if not course:
                 logger.warning(f"Skipping entry: Course '{item.course_name}' not found.")
                 continue
 
             course_entry = CourseEntry(
+                provider_message_id=item.provider_message_id,
                 customer_email=item.customer_email,
                 course_id=course.id,
                 course_date=item.course_date,
-                sent_at=item.sent_at
+                sent_at=item.sent_at,
             )
             db.add(course_entry)
             inserted_entries.append(course_entry)
+            entry_map[provider_message_id] = course_entry
 
         db.commit()
+        for entry in inserted_entries:
+            db.refresh(entry)
 
-        entry_ids = [e.id for e in inserted_entries if e.id]
-        result = (
-            db.query(CourseEntry)
-            .options(joinedload(CourseEntry.course), joinedload(CourseEntry.customer))
-            .filter(CourseEntry.id.in_(entry_ids))
-            .order_by(desc(CourseEntry.course_date))
-            .all()
-        )
-        logger.info(f"Successfully added {len(result)} course entries in batch.")
-        return result
+        logger.info(f"Successfully added {len(inserted_entries)} course entries in batch.")
+        return inserted_entries
+    
     except (SQLAlchemyError, ValueError, KeyError) as e:
         db.rollback()
         logger.error(f"Failed to batch add course entries to database: {e}", exc_info=True)

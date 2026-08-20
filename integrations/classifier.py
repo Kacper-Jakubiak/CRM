@@ -6,21 +6,22 @@ from schemas import ProcessedEmail
 from logger import logger
 
 class EmailClassifier:
-    def __init__(self, course_names: list[str]):
+    def __init__(self, course_names: list[str], should_use_AI: bool = True):
         self.course_names = course_names
-        try:
-          self.client = OpenAI()
-        except Exception as e:
-          logger.warning(f"Failed to log into OpenAI: {e}")
-          logger.info("AI classification skipped")
-          self.client = None
+        self.client = None
+        if should_use_AI:
+          try:
+            self.client = OpenAI()
+          except Exception as e:
+            logger.warning(f"Failed to log into OpenAI: {e}")
+            logger.info("AI classification skipped")
 
     def classify_category(self, process_result: ProcessedEmail) -> tuple[str, bool]:
         stripped_body_text = strip_body(process_result.body)
 
         found_names = check_course_names(self.course_names, process_result.subject, stripped_body_text)
         category = "_".join(found_names).lower() or "other"
-
+        
         if '?' in stripped_body_text:
            needs_response = True
         elif self.client is None:
@@ -33,9 +34,11 @@ class EmailClassifier:
 
 def check_course_names(course_names: list[str], subject: str, body: str) -> list[str]:
   found_courses = []
+  subject_lower = subject.lower()
+  body_lower = body.lower()
   for course in course_names:
     course_lower = course.lower()
-    if course_lower in subject or course_lower in body:
+    if course_lower in subject_lower or course_lower in body_lower:
       found_courses.append(course)
 
   return found_courses

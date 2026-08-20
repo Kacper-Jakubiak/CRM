@@ -18,11 +18,11 @@ class Base(DeclarativeBase):
     pass
 
 
-class AppConfig(Base):
-    __tablename__ = "app_config"
+# class AppConfig(Base):
+#     __tablename__ = "app_config"
 
-    key: Mapped[str] = mapped_column(primary_key=True)
-    value: Mapped[str] = mapped_column(nullable=False)
+#     key: Mapped[str] = mapped_column(primary_key=True)
+#     value: Mapped[str] = mapped_column(nullable=False)
 
 
 class Customer(Base):
@@ -66,11 +66,11 @@ class EmailMessage(Base):
 class CourseEntry(Base):
     __tablename__ = "course_entries"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_message_id: Mapped[str] = mapped_column(primary_key=True)
     customer_email: Mapped[str] = mapped_column(ForeignKey("customers.email"), index=True, nullable=False)
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True, nullable=False)
     course_date: Mapped[datetime] = mapped_column(nullable=False)
-    sent_at: Mapped[datetime] = mapped_column(default=func.now(), nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(nullable=False)
 
     course: Mapped["Course"] = relationship("Course", back_populates="entries")
     customer: Mapped["Customer"] = relationship("Customer", back_populates="course_entries")

@@ -19,6 +19,16 @@ def get_emails(db: Session) -> list[EmailMessage]:
         raise
 
 
+def get_newest_email(db: Session) -> EmailMessage | None:
+    try:
+        message = db.query(EmailMessage).order_by(EmailMessage.sent_at.desc()).first()
+        logger.info(f"Retrieved email message.")
+        return message
+    except SQLAlchemyError as e:
+        logger.error(f"Failed to retrieve email: {e}", exc_info=True)
+        raise
+
+
 def get_thread_messages(db: Session, thread_id: int) -> list[EmailMessage] | None:
     try:
         thread = db.query(Thread).filter_by(id=thread_id).first()
@@ -33,20 +43,17 @@ def get_thread_messages(db: Session, thread_id: int) -> list[EmailMessage] | Non
         logger.error(f"Failed to fetch messages for thread_id '{thread_id}': {e}", exc_info=True)
         raise
 
+
 def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[EmailMessage]:
     if not emails:
         return []
 
     try:
-        batch_emails = {item.customer_email for item in emails}
-        batch_email_ids = {item.provider_message_id for item in emails}
-        parent_ids = {item.parent_message_provider_id for item in emails if item.parent_message_provider_id}
-        
-        all_needed_provider_ids = batch_email_ids.union(parent_ids)
+        customer_emails = {item.customer_email for item in emails}
 
-        existing_customers = db.query(Customer).filter(Customer.email.in_(batch_emails)).all()
+        existing_customers = db.query(Customer).filter(Customer.email.in_(customer_emails)).all()
         existing_emails = {c.email for c in existing_customers}
-        missing_emails = batch_emails - existing_emails
+        missing_emails = customer_emails - existing_emails
 
         new_customers_data = []
         seen_in_batch = set()
@@ -64,6 +71,10 @@ def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[Email
         if new_customers_data:
             db.execute(insert(Customer), new_customers_data)
 
+        batch_email_ids = {item.provider_message_id for item in emails}
+        parent_ids = {item.parent_message_provider_id for item in emails if item.parent_message_provider_id}
+        all_needed_provider_ids = batch_email_ids.union(parent_ids)
+
         existing_messages = db.query(EmailMessage).filter(
             EmailMessage.provider_message_id.in_(all_needed_provider_ids)
         ).all()
@@ -71,7 +82,7 @@ def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[Email
         message_map = {m.provider_message_id: m for m in existing_messages}
         batch_thread_map = {pid: m.thread_id for pid, m in message_map.items()}
 
-        ingested_messages = []
+        ingested_messages: list[EmailMessage] = []
 
         for email_data in emails:
             provider_message_id = email_data.provider_message_id
@@ -121,6 +132,7 @@ def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[Email
         db.rollback()
         logger.error(f"Failed to ingest email batch: {e}", exc_info=True)
         raise
+
       
 def update_email_status(db: Session, provider_message_id: str, needs_response: bool) -> EmailMessage | None:
     try:
