@@ -382,7 +382,6 @@ button {
   margin-bottom: 6px;
   padding: 0.35rem 0.4rem;
   border-radius: 6px;
-  color: var(--text);
   text-align: left;
   list-style: none;
 }
@@ -505,8 +504,6 @@ button {
 
 .thread-title {
   margin: 0;
-  font-size: 0.72rem;
-  color: var(--text);
   white-space: nowrap;
   flex: 1;
   text-align: left;
@@ -572,7 +569,6 @@ button {
 }
 
 .email-subject {
-  font-size: 0.7rem;
   word-break: break-word;
   flex: 1;
   text-align: left;
@@ -941,4 +937,16 @@ button {
 
 .list-item-name {
   font-weight: bold;
+}
+
+.is-unseen {
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  color: var(--text) !important;
+}
+
+.is-seen {
+  font-weight: 400 !important;
+  font-size: 0.68rem !important;
+  color: var(--muted) !important;
 }

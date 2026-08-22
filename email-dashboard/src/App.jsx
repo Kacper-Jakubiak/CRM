@@ -34,6 +34,7 @@ const groupEntriesByDate = (entries) => {
 
 function DisplayEmail({ msg, customerEmail, onSelectMessage, isSelected }) {
   const emailAddress = customerEmail || msg.sender || 'Unknown';
+  const displayClass = msg.seen === false ? 'is-unseen' : 'is-seen';
 
   return (
     <li
@@ -41,7 +42,7 @@ function DisplayEmail({ msg, customerEmail, onSelectMessage, isSelected }) {
       onClick={() => onSelectMessage && onSelectMessage(msg)}
     >
       <div className="email-header">
-        <strong className="email-subject">{msg.subject || '(No Subject)'}</strong>
+        <span className={`email-subject ${displayClass}`}>{msg.subject || '(No Subject)'}</span>
         <span className="email-timestamp">{msg.sent_at ? new Date(msg.sent_at).toLocaleString() : ''}</span>
       </div>
 
@@ -149,6 +150,8 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
   };
 
   const displayedMessages = collapsed ? threadMessages.slice(0, 1) : threadMessages;
+  const hasUnseen = threadMessages.some(m => m.seen === false);
+  const threadClass = hasUnseen ? 'is-unseen' : 'is-seen';
 
   return (
     <div className="thread-card">
@@ -156,7 +159,7 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
         className={`thread-header ${collapsed ? 'collapsed' : 'expanded'}`}
         onClick={handleToggleCollapse}
       >
-        <h4 className="thread-title">
+        <h4 className={`thread-title ${threadClass}`}>
           {collapsed ? '▶ ' : '▼ '}Thread #{threadId !== 'Unassigned' ? threadId : 'Unassigned'}
           <span className="thread-count"> ({threadMessages.length} {threadMessages.length === 1 ? 'msg' : 'msgs'})</span>
         </h4>
@@ -808,8 +811,8 @@ function App() {
                           <div className="entry-group-title">Date: {group.dateLabel}</div>
                           <ul className="group-entry-list">
                             {group.items.map((entry) => (
-                              <li key={entry.id} className="entry-item">
-                                <strong>Email:</strong> {entry.customer_email || 'Unknown'}
+                              <li key={entry.id} className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}>
+                                <span>Email:</span> {entry.customer_email || 'Unknown'}
                               </li>
                             ))}
                           </ul>
@@ -939,8 +942,8 @@ function App() {
                           <div className="entry-group-title">Date: {group.dateLabel}</div>
                           <ul className="group-entry-list">
                             {group.items.map((entry) => (
-                              <li key={entry.id} className="entry-item">
-                                <strong>Course:</strong> {entry.course_name}
+                              <li key={entry.id} className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}>
+                                <span>Course:</span> {entry.course_name}
                               </li>
                             ))}
                           </ul>
