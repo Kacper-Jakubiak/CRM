@@ -120,6 +120,29 @@ def update_message_status(provider_message_id: str, needs_response: bool, db: Se
     return email_message
 
 
+@router.patch("/seen", response_model=EmailMessageResponse)
+def update_message_seen(provider_message_id: str, seen_status: bool, db: Session = Depends(get_db)):
+    try:
+        email_message = email_service.set_seen(
+            db=db,
+            provider_message_id=provider_message_id,
+            seen_status=seen_status
+        )
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update message status"
+        )
+
+    if email_message is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message not found"
+        )
+
+    return email_message
+
+
 @router.patch("/move", response_model=EmailMessageResponse)
 def move_message_to_thread(provider_message_id: str, new_thread_id: int, db: Session = Depends(get_db)):
     try:

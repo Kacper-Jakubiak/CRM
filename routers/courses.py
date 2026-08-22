@@ -36,6 +36,29 @@ def get_course_entries(db: Session = Depends(get_db)):
     return entries
 
 
+@router.patch("/seen", response_model=CourseEntryResponse)
+def update_message_seen(provider_message_id: str, seen_status: bool, db: Session = Depends(get_db)):
+    try:
+        course_entry = course_service.set_seen(
+            db=db,
+            provider_message_id=provider_message_id,
+            seen_status=seen_status
+        )
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update entry status"
+        )
+
+    if course_entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Entry not found"
+        )
+
+    return course_entry
+
+
 @router.post("/entries/batch", status_code=status.HTTP_201_CREATED, response_model=list[CourseEntryResponse])
 def add_course_entries_batch(payload: CourseEntryBatchRequest, db: Session = Depends(get_db)):
     try:

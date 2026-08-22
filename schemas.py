@@ -46,6 +46,7 @@ class CourseEntryResponse(BaseModel):
     course_id: int
     course_date: datetime
     sent_at: datetime
+    seen: bool
 
     course_name: str = Field(validation_alias=AliasPath("course", "name"))
 
@@ -61,6 +62,7 @@ class EmailMessageResponse(BaseModel):
     needs_response: bool
     category: str
     thread_id: int
+    seen: bool
 
     class Config:
         from_attributes = True

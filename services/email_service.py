@@ -133,6 +133,22 @@ def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[Email
         logger.error(f"Failed to ingest email batch: {e}", exc_info=True)
         raise
 
+
+def set_seen(db: Session, provider_message_id: str, seen_status: bool) -> EmailMessage | None:
+    try:
+        message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
+        if message is None:
+            logger.warning(f"Entry '{provider_message_id}' not found when fetching entries.")
+            return None
+        message.seen = seen_status
+        db.commit()
+        db.refresh(message)
+        logger.info(f"Updated 'seen' to {seen_status} for message '{provider_message_id}'.")
+        return message
+    except SQLAlchemyError as e:
+        logger.error(f"Failed to retrieve message: {e}", exc_info=True)
+        raise
+
       
 def update_email_status(db: Session, provider_message_id: str, needs_response: bool) -> EmailMessage | None:
     try:

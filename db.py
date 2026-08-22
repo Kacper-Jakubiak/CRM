@@ -58,6 +58,7 @@ class EmailMessage(Base):
     needs_response: Mapped[bool] = mapped_column(nullable=False)
     category: Mapped[str] = mapped_column(nullable=False)
     thread_id: Mapped[int] = mapped_column(ForeignKey("threads.id"), index=True, nullable=False)
+    seen: Mapped[bool] = mapped_column(nullable=False, default=False)
 
     customer: Mapped["Customer"] = relationship("Customer", back_populates="email_messages")
     thread: Mapped["Thread"] = relationship("Thread", back_populates="messages")
@@ -71,6 +72,7 @@ class CourseEntry(Base):
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True, nullable=False)
     course_date: Mapped[datetime] = mapped_column(nullable=False)
     sent_at: Mapped[datetime] = mapped_column(nullable=False)
+    seen: Mapped[bool] = mapped_column(nullable=False, default=False)
 
     course: Mapped["Course"] = relationship("Course", back_populates="entries")
     customer: Mapped["Customer"] = relationship("Customer", back_populates="course_entries")

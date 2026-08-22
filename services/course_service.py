@@ -59,7 +59,7 @@ def get_all_entries(db: Session) -> list[CourseEntry]:
 
 def get_newest_entry(db: Session) -> CourseEntry | None:
     try:
-        message = db.query(CourseEntry).order_by(CourseEntry.sent_at.desc()).first()
+        message = db.query(CourseEntry).options(joinedload(CourseEntry.course)).order_by(CourseEntry.sent_at.desc()).first()
         logger.info(f"Retrieved course entry message.")
         return message
     except SQLAlchemyError as e:
@@ -137,6 +137,22 @@ def add_course_entries_batch(db: Session, entries: list[CourseEntryRequest]) -> 
         db.rollback()
         logger.error(f"Failed to batch add course entries to database: {e}", exc_info=True)
         raise
+
+def set_seen(db: Session, provider_message_id: str, seen_status: bool) -> CourseEntry | None:
+    try:
+        entry = db.query(CourseEntry).filter_by(provider_message_id=provider_message_id).options(joinedload(CourseEntry.course)).first()
+        if entry is None:
+            logger.warning(f"Entry '{provider_message_id}' not found when fetching entries.")
+            return None
+        entry.seen = seen_status
+        db.commit()
+        db.refresh(entry)
+        logger.info(f"Updated 'seen' to {seen_status} for entry '{provider_message_id}'.")
+        return entry
+    except SQLAlchemyError as e:
+        logger.error(f"Failed to retrieve entry: {e}", exc_info=True)
+        raise
+
 
 def get_course_entries(db: Session, course_name: str) -> list[CourseEntry] | None:
     try:
