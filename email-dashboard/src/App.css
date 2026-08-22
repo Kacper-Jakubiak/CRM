@@ -356,9 +356,11 @@ button {
 }
 
 .entry-group-title {
-  font-weight: 700;
+  font-family: monospace;
+  font-weight: 500;
+  font-size: 0.88rem;
+  color: var(--accent);
   margin-bottom: 8px;
-  color: var(--text);
   text-align: left;
   position: relative;
   padding-left: 18px;

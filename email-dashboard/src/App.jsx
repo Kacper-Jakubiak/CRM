@@ -32,14 +32,40 @@ const groupEntriesByDate = (entries) => {
     });
 };
 
-function DisplayEmail({ msg, customerEmail, onSelectMessage, isSelected }) {
+function DisplayEmail({ msg, customerEmail, onSelectMessage, isSelected, onMessageUpdate }) {
   const emailAddress = customerEmail || msg.sender || 'Unknown';
   const displayClass = msg.seen === false ? 'is-unseen' : 'is-seen';
+
+  const handleClick = async () => {
+    // Preserve original onClick functionality
+    if (onSelectMessage) {
+      onSelectMessage(msg);
+    }
+
+    // Add new "mark as seen" functionality
+    if (msg.seen === false) {
+      try {
+        const res = await fetch(`/api/emails/seen?provider_message_id=${encodeURIComponent(msg.provider_message_id)}&seen_status=true`, {
+          method: 'PATCH',
+        });
+        
+        if (res.ok) {
+          const updatedMsg = await res.json();
+          // Use the response data to update site state
+          if (onMessageUpdate) {
+            onMessageUpdate(updatedMsg);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to mark email as seen:', err);
+      }
+    }
+  };
 
   return (
     <li
       className={`email-item ${isSelected ? 'selected' : ''}`}
-      onClick={() => onSelectMessage && onSelectMessage(msg)}
+      onClick={handleClick}
     >
       <div className="email-header">
         <span className={`email-subject ${displayClass}`}>{msg.subject || '(No Subject)'}</span>
@@ -622,6 +648,39 @@ function App() {
     }
   };
 
+  const handleCourseEntryClick = async (entry) => {
+    // Only fetch if the entry hasn't been marked as seen yet
+    if (entry.seen !== false) return; 
+
+    try {
+      const res = await fetch(`/api/courses/seen?provider_message_id=${encodeURIComponent(entry.provider_message_id)}&seen_status=true`, {
+        method: 'PATCH',
+      });
+      
+      if (res.ok) {
+        const updatedEntry = await res.json();
+        
+        // Update local state for Course View entries
+        setCourseData((prev) => ({
+          ...prev,
+          entries: prev.entries.map((e) =>
+            e.provider_message_id === updatedEntry.provider_message_id ? { ...e, ...updatedEntry } : e
+          ),
+        }));
+
+        // Update local state for Customer View entries
+        setCustomerHistory((prev) => ({
+          ...prev,
+          course_entries: prev.course_entries.map((e) =>
+            e.provider_message_id === updatedEntry.provider_message_id ? { ...e, ...updatedEntry } : e
+          ),
+        }));
+      }
+    } catch (err) {
+      console.error('Error marking course entry as seen:', err);
+    }
+  };
+
   const q = searchQuery.trim().toLowerCase();
 
   const filteredCourses = courses
@@ -808,11 +867,15 @@ function App() {
                     <ul className="entries-list">
                       {groupEntriesByDate(courseData.entries).map((group) => (
                         <li key={group.dateKey} className="entry-group">
-                          <div className="entry-group-title">Date: {group.dateLabel}</div>
+                          <div className="entry-group-title">Date: {group.dateLabel} ({group.items.length})</div>
                           <ul className="group-entry-list">
                             {group.items.map((entry) => (
-                              <li key={entry.id} className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}>
-                                <span>Email:</span> {entry.customer_email || 'Unknown'}
+                              <li 
+                                key={entry.id} 
+                                className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}
+                                onClick={() => handleCourseEntryClick(entry)}
+                              >
+                                <span>Course:</span> {entry.course_name || selectedCourse} | <span>Email:</span> {entry.customer_email || 'Unknown'}
                               </li>
                             ))}
                           </ul>
@@ -939,11 +1002,15 @@ function App() {
                     <ul className="entries-list">
                       {groupEntriesByDate(customerHistory.course_entries).map((group) => (
                         <li key={group.dateKey} className="entry-group">
-                          <div className="entry-group-title">Date: {group.dateLabel}</div>
+                          <div className="entry-group-title">Date: {group.dateLabel} ({group.items.length})</div>
                           <ul className="group-entry-list">
                             {group.items.map((entry) => (
-                              <li key={entry.id} className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}>
-                                <span>Course:</span> {entry.course_name}
+                              <li 
+                                key={entry.id} 
+                                className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}
+                                onClick={() => handleCourseEntryClick(entry)}
+                              >
+                                <span>Course:</span> {entry.course_name || 'Unknown'} | <span>Email:</span> {entry.customer_email || 'Unknown'}
                               </li>
                             ))}
                           </ul>
