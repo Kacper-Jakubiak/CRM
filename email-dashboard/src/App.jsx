@@ -288,6 +288,8 @@ function App() {
   const [theme, setTheme] = useState('dark');
   const [courses, setCourses] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [globalEntries, setGlobalEntries] = useState([]);
+  const [globalMessages, setGlobalMessages] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState('All');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [courseData, setCourseData] = useState({ entries: [], messages: [] });
@@ -334,6 +336,23 @@ function App() {
       .catch((err) => console.error('Error fetching customers:', err));
   };
 
+  const fetchGlobalData = async () => {
+    try {
+      const [entriesRes, emailsRes] = await Promise.all([
+        fetch(`/api/courses/entries`),
+        fetch(`/api/emails`),
+      ]);
+      const entriesData = entriesRes.ok ? await entriesRes.json() : [];
+      const messagesData = emailsRes.ok ? await emailsRes.json() : [];
+      setGlobalEntries(entriesData);
+      setGlobalMessages(messagesData);
+      return { entriesData, messagesData };
+    } catch (err) {
+      console.error('Error fetching global data:', err);
+      return { entriesData: [], messagesData: [] };
+    }
+  };
+
   useEffect(() => {
     fetchCoursesAndCustomers();
     handleAllCourseEntries();
@@ -374,14 +393,8 @@ function App() {
     setLoading(true);
 
     try {
-      const [entriesRes, emailsRes] = await Promise.all([
-        fetch(`/api/courses/entries`),
-        fetch(`/api/emails`),
-      ]);
-
-      const entriesData = entriesRes.ok ? await entriesRes.json() : [];
-      const messagesData = emailsRes.ok ? await emailsRes.json() : [];
-
+      const { entriesData, messagesData } = await fetchGlobalData();
+      
       setCourseData({
         entries: entriesData,
         messages: messagesData,
@@ -433,13 +446,7 @@ function App() {
     setLoading(true);
 
     try {
-      const [entriesRes, emailsRes] = await Promise.all([
-        fetch(`/api/courses/entries`),
-        fetch(`/api/emails`),
-      ]);
-
-      const entriesData = entriesRes.ok ? await entriesRes.json() : [];
-      const messagesData = emailsRes.ok ? await emailsRes.json() : [];
+      const { entriesData, messagesData } = await fetchGlobalData();
 
       setCustomerHistory({
         customer: { email: 'All' },
@@ -489,6 +496,7 @@ function App() {
       }
 
       fetchCoursesAndCustomers();
+      await fetchGlobalData();
       refreshActiveView();
     } catch (err) {
       console.error('Error during sync:', err);
@@ -512,6 +520,10 @@ function App() {
         m.provider_message_id === updatedMsg.provider_message_id ? { ...m, ...updatedMsg } : m
       ),
     }));
+
+    setGlobalMessages((prev) => prev.map((m) => 
+      m.provider_message_id === updatedMsg.provider_message_id ? { ...m, ...updatedMsg } : m
+    ));
 
     setSelectedEmail((prev) => (prev && prev.provider_message_id === updatedMsg.provider_message_id ? { ...prev, ...updatedMsg } : prev));
   };
@@ -649,7 +661,6 @@ function App() {
   };
 
   const handleCourseEntryClick = async (entry) => {
-    // Only fetch if the entry hasn't been marked as seen yet
     if (entry.seen !== false) return; 
 
     try {
@@ -660,7 +671,6 @@ function App() {
       if (res.ok) {
         const updatedEntry = await res.json();
         
-        // Update local state for Course View entries
         setCourseData((prev) => ({
           ...prev,
           entries: prev.entries.map((e) =>
@@ -668,13 +678,16 @@ function App() {
           ),
         }));
 
-        // Update local state for Customer View entries
         setCustomerHistory((prev) => ({
           ...prev,
           course_entries: prev.course_entries.map((e) =>
             e.provider_message_id === updatedEntry.provider_message_id ? { ...e, ...updatedEntry } : e
           ),
         }));
+
+        setGlobalEntries((prev) => prev.map((e) =>
+          e.provider_message_id === updatedEntry.provider_message_id ? { ...e, ...updatedEntry } : e
+        ));
       }
     } catch (err) {
       console.error('Error marking course entry as seen:', err);
@@ -797,31 +810,38 @@ function App() {
                         <span className="company-header-count">({custs.length})</span>
                       </div>
 
-                      {!isCollapsed && custs.map((item) => (
-                        <button
-                          key={item.id}
-                          className={`${selectedCustomer === item.email ? 'list-item active' : 'list-item'} list-item-plain list-item-flex customer-item-nested`}
-                          onClick={() => handleCustomerClick(item.email)}
-                          type="button"
-                        >
-                          <div className="list-item-customer-details">
-                            {item.name && (
-                              <span className="list-item-name">
-                                {item.name}
+                      {!isCollapsed && custs.map((item) => {
+                        const hasUnseen = globalEntries.some(e => e.customer_email === item.email && e.seen === false) || 
+                                          globalMessages.some(m => (m.customer_email === item.email || m.sender === item.email) && m.seen === false);
+                        
+                        const textClass = hasUnseen ? 'is-unseen' : 'is-seen';
+                        
+                        return (
+                          <button
+                            key={item.id}
+                            className={`${selectedCustomer === item.email ? 'list-item active' : 'list-item'} list-item-plain list-item-flex customer-item-nested`}
+                            onClick={() => handleCustomerClick(item.email)}
+                            type="button"
+                          >
+                            <div className="list-item-customer-details">
+                              {item.name && (
+                                <span className={`list-item-name ${textClass}`}>
+                                  {item.name}
+                                </span>
+                              )}
+                              <span className={`list-item-email ${textClass}`} title={item.email}>
+                                {item.email}
+                              </span>
+                            </div>
+                            
+                            {item.note && (
+                              <span className="list-item-note" title={item.note}>
+                                {item.note}
                               </span>
                             )}
-                            <span className="list-item-email" title={item.email}>
-                              {item.email}
-                            </span>
-                          </div>
-                          
-                          {item.note && (
-                            <span className="list-item-note" title={item.note}>
-                              {item.note}
-                            </span>
-                          )}
-                        </button>
-                      ))}
+                          </button>
+                        );
+                      })}
                     </div>
                   );
                 })
