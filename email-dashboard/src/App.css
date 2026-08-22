@@ -379,6 +379,7 @@ button {
   padding: 0.35rem 0.4rem;
   text-align: left;
   list-style: none;
+  cursor: pointer;
 }
 
 .empty-text {

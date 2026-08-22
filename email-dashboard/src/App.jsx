@@ -33,7 +33,7 @@ const groupEntriesByDate = (entries) => {
 };
 
 function DisplayEmail({ msg, customerEmail, onSelectMessage, isSelected, onMessageUpdate }) {
-  const emailAddress = customerEmail || msg.sender || 'Unknown';
+  const emailAddress = customerEmail;
   const displayClass = msg.seen === false ? 'is-unseen' : 'is-seen';
 
   const handleClick = async () => {
@@ -567,7 +567,7 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipient_email: selectedEmail.customer_email || selectedEmail.sender || selectedCustomer,
+          recipient_email: selectedEmail.customer_email,
           subject: `Re: ${selectedEmail.subject || 'No Subject'}`,
           body: replyText,
           reply_message_id: selectedEmail.provider_message_id,
@@ -711,7 +711,7 @@ function App() {
       return email.includes(q) || name.includes(q) || note.includes(q) || company.includes(q);
     })
     .slice();
-  filteredCustomers.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+  filteredCustomers.sort((a, b) => (a.email).localeCompare(b.email));
 
   const customersByCompany = Object.entries(
     filteredCustomers.reduce((acc, c) => {
@@ -812,7 +812,7 @@ function App() {
 
                       {!isCollapsed && custs.map((item) => {
                         const hasUnseen = globalEntries.some(e => e.customer_email === item.email && e.seen === false) || 
-                                          globalMessages.some(m => (m.customer_email === item.email || m.sender === item.email) && m.seen === false);
+                                          globalMessages.some(m => m.customer_email === item.email && m.seen === false);
                         
                         const textClass = hasUnseen ? 'is-unseen' : 'is-seen';
                         
@@ -891,12 +891,13 @@ function App() {
                           <ul className="group-entry-list">
                             {group.items.map((entry) => (
                               <li 
-                                key={entry.id} 
-                                className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}
-                                onClick={() => handleCourseEntryClick(entry)}
-                              >
-                                <span>Course:</span> {entry.course_name || selectedCourse} | <span>Email:</span> {entry.customer_email || 'Unknown'}
-                              </li>
+                              key={entry.id} 
+                              className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}
+                              onClick={() => handleCourseEntryClick(entry)}
+                            >
+                              <div><span>Course:</span> {entry.course_name}</div>
+                              <div><span>Email:</span> {entry.customer_email}</div>
+                            </li>
                             ))}
                           </ul>
                         </li>
@@ -1026,12 +1027,13 @@ function App() {
                           <ul className="group-entry-list">
                             {group.items.map((entry) => (
                               <li 
-                                key={entry.id} 
-                                className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}
-                                onClick={() => handleCourseEntryClick(entry)}
-                              >
-                                <span>Course:</span> {entry.course_name || 'Unknown'} | <span>Email:</span> {entry.customer_email || 'Unknown'}
-                              </li>
+                              key={entry.id} 
+                              className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}
+                              onClick={() => handleCourseEntryClick(entry)}
+                            >
+                              <div><span>Course:</span> {entry.course_name}</div>
+                              <div><span>Email:</span> {entry.customer_email}</div>
+                            </li>
                             ))}
                           </ul>
                         </li>
@@ -1064,7 +1066,7 @@ function App() {
 
               <div className="email-detail__header-info">
                 <div className="email-detail__from">
-                  <strong>From:</strong> {selectedEmail.sender || selectedCustomer}
+                  <strong>From:</strong> {selectedEmail.customer_email}
                 </div>
                 <div className="email-detail__subject">
                   <strong>Subject:</strong> {selectedEmail.subject || '(No Subject)'}
