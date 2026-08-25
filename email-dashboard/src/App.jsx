@@ -817,7 +817,7 @@ function App() {
           <button className="theme-toggle" onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} type="button">
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
-          <button className="theme-toggle" onClick={handleSyncData} disabled={isSyncing} type="button">
+          <button className="sync-button" onClick={handleSyncData} disabled={isSyncing} type="button">
             {isSyncing ? 'Syncing…' : 'Sync data'}
           </button>
           <button className="theme-toggle" onClick={handleLogout} type="button">
