@@ -14,8 +14,10 @@ JWT_SECRET = os.getenv("JWT_SECRET")
 if not JWT_SECRET:
     raise ValueError("CRITICAL: JWT_SECRET environment variable is not set!")
 
-ADMIN_USER = os.getenv("ADMIN_USER", "admin")
-ADMIN_PASS = os.getenv("ADMIN_PASSWORD", "yourpassword")
+ADMIN_USER = os.getenv("ADMIN_USER", "")
+ADMIN_PASS = os.getenv("ADMIN_PASSWORD", "")
+if not ADMIN_USER or not ADMIN_PASS:
+    raise ValueError("CRITICAL: ADMIN_USER or ADMIN_PASS environment variable is not set!")
 ALGORITHM = "HS256"
 
 router = APIRouter(prefix="/api", tags=["Auth"])
@@ -28,6 +30,8 @@ class LoginRequest(BaseModel):
 @router.post("/login")
 def login(data: LoginRequest):
     logger.info(f"Login attempt initiated for user: {data.username}, password: {data.password}")
+    # print(f"DEBUG INPUT -> User: '{data.username}', Pass: '{data.password}'")
+    # print(f"DEBUG ENV   -> Admin: '{ADMIN_USER}', Pass: '{ADMIN_PASS}'")
 
     is_user_correct = secrets.compare_digest(data.username, ADMIN_USER)
     is_pass_correct = secrets.compare_digest(data.password, ADMIN_PASS)
