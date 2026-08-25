@@ -755,7 +755,7 @@ function App() {
     return (
       <div className={`app-shell theme-${theme}`} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <div className="panel" style={{ padding: '2rem', minWidth: '300px' }}>
-          <h2>Admin Login</h2>
+          <h2>Login</h2>
           <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
             <input
               type="text"
