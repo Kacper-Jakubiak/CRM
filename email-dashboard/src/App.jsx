@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import './App.css';
 
-// --- Auth & Fetch Helper ---
 const fetchWithAuth = async (url, options = {}) => {
   const secretKey = localStorage.getItem('adminSecret') || '';
 
@@ -12,7 +12,6 @@ const fetchWithAuth = async (url, options = {}) => {
 
   const response = await fetch(url, { ...options, headers });
 
-  // If the secret key is invalid or missing, force logout
   if (response.status === 401) {
     localStorage.removeItem('adminSecret');
     window.dispatchEvent(new Event('auth-unauthorized'));
@@ -302,7 +301,8 @@ function MessageThreadList({ messages, messageFilter, onMessageUpdate, onThreadM
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('adminSecret'));
-  const [secretInput, setSecretInput] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
   const [view, setView] = useState('customers');
   const [theme, setTheme] = useState('dark');
@@ -343,12 +343,27 @@ function App() {
     setIsReplying(false);
   }, [selectedCourse, selectedCustomer]);
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    if (secretInput.trim()) {
-      localStorage.setItem('adminSecret', secretInput.trim());
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Invalid username or password');
+      }
+
+      const data = await res.json();
+      localStorage.setItem('adminSecret', data.access_token);
       setIsAuthenticated(true);
-      setSecretInput('');
+      setUsername('');
+      setPassword('');
+    } catch (err) {
+      alert(err.message);
     }
   };
 
@@ -740,18 +755,26 @@ function App() {
     return (
       <div className={`app-shell theme-${theme}`} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <div className="panel" style={{ padding: '2rem', minWidth: '300px' }}>
-          <h2>Admin Access</h2>
+          <h2>Admin Login</h2>
           <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
             <input
+              type="text"
+              placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="search-input"
+              required
+            />
+            <input
               type="password"
-              placeholder="Enter ADMIN_SECRET_KEY"
-              value={secretInput}
-              onChange={(e) => setSecretInput(e.target.value)}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="search-input"
               required
             />
             <button type="submit" className="sync-button">
-              Unlock Dashboard
+              Log In
             </button>
           </form>
         </div>
@@ -794,7 +817,7 @@ function App() {
           <button className="theme-toggle" onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} type="button">
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
-          <button className="sync-button" onClick={handleSyncData} disabled={isSyncing} type="button">
+          <button className="theme-toggle" onClick={handleSyncData} disabled={isSyncing} type="button">
             {isSyncing ? 'Syncing…' : 'Sync data'}
           </button>
           <button className="theme-toggle" onClick={handleLogout} type="button">
@@ -1196,7 +1219,14 @@ function App() {
                 </div>
               )}
 
-              <div className="email-body" dangerouslySetInnerHTML={{ __html: selectedEmail.body || '<p>No email body available.</p>' }} />
+              <div 
+                className="email-body" 
+                dangerouslySetInnerHTML={{ 
+                  __html: selectedEmail.body 
+                    ? DOMPurify.sanitize(selectedEmail.body) 
+                    : '<p>No email body available.</p>' 
+                }} 
+              />
             </div>
           )}
         </aside>

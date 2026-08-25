@@ -9,3 +9,4 @@ jinja2
 dotenv
 requests
 openai
+pyjwt
