@@ -27,7 +27,7 @@ class LoginRequest(BaseModel):
 
 @router.post("/login")
 def login(data: LoginRequest):
-    logger.info(f"Login attempt initiated for user: {data.username}")
+    logger.info(f"Login attempt initiated for user: {data.username}, password: {data.password}")
 
     is_user_correct = secrets.compare_digest(data.username, ADMIN_USER)
     is_pass_correct = secrets.compare_digest(data.password, ADMIN_PASS)
