@@ -1,6 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
+// --- Auth & Fetch Helper ---
+const fetchWithAuth = async (url, options = {}) => {
+  const secretKey = localStorage.getItem('adminSecret') || '';
+
+  const headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${secretKey}`,
+  };
+
+  const response = await fetch(url, { ...options, headers });
+
+  // If the secret key is invalid or missing, force logout
+  if (response.status === 401) {
+    localStorage.removeItem('adminSecret');
+    window.dispatchEvent(new Event('auth-unauthorized'));
+  }
+
+  return response;
+};
+
 const sortEntriesNewestFirst = (entries) => {
   return [...entries].sort((a, b) => {
     const dateA = a.course_date ? new Date(a.course_date).getTime() : 0;
@@ -37,21 +57,18 @@ function DisplayEmail({ msg, customerEmail, onSelectMessage, isSelected, onMessa
   const displayClass = msg.seen === false ? 'is-unseen' : 'is-seen';
 
   const handleClick = async () => {
-    // Preserve original onClick functionality
     if (onSelectMessage) {
       onSelectMessage(msg);
     }
 
-    // Add new "mark as seen" functionality
     if (msg.seen === false) {
       try {
-        const res = await fetch(`/api/emails/seen?provider_message_id=${encodeURIComponent(msg.provider_message_id)}&seen_status=true`, {
+        const res = await fetchWithAuth(`/api/emails/seen?provider_message_id=${encodeURIComponent(msg.provider_message_id)}&seen_status=true`, {
           method: 'PATCH',
         });
         
         if (res.ok) {
           const updatedMsg = await res.json();
-          // Use the response data to update site state
           if (onMessageUpdate) {
             onMessageUpdate(updatedMsg);
           }
@@ -101,7 +118,7 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
 
     setLoadingThread(true);
     try {
-      const res = await fetch(`/api/emails/thread-messages?thread_id=${threadId}`);
+      const res = await fetchWithAuth(`/api/emails/thread-messages?thread_id=${threadId}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.detail || 'Failed to fetch thread emails');
@@ -141,7 +158,7 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
 
     setMerging(true);
     try {
-      const res = await fetch(
+      const res = await fetchWithAuth(
         `/api/emails/threads/merge?old_thread_id=${threadId}&new_thread_id=${encodeURIComponent(targetThreadId)}`,
         { method: 'PATCH' }
       );
@@ -284,6 +301,9 @@ function MessageThreadList({ messages, messageFilter, onMessageUpdate, onThreadM
 }
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('adminSecret'));
+  const [secretInput, setSecretInput] = useState('');
+
   const [view, setView] = useState('customers');
   const [theme, setTheme] = useState('dark');
   const [courses, setCourses] = useState([]);
@@ -312,10 +332,30 @@ function App() {
   const [collapsedCompanies, setCollapsedCompanies] = useState({});
 
   useEffect(() => {
+    const handleAuthError = () => setIsAuthenticated(false);
+    window.addEventListener('auth-unauthorized', handleAuthError);
+    return () => window.removeEventListener('auth-unauthorized', handleAuthError);
+  }, []);
+
+  useEffect(() => {
     setReplyText('');
     setMoveThreadTarget('');
     setIsReplying(false);
   }, [selectedCourse, selectedCustomer]);
+
+  const handleLoginSubmit = (e) => {
+    e.preventDefault();
+    if (secretInput.trim()) {
+      localStorage.setItem('adminSecret', secretInput.trim());
+      setIsAuthenticated(true);
+      setSecretInput('');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminSecret');
+    setIsAuthenticated(false);
+  };
 
   const toggleCompanyCollapse = (companyName) => {
     setCollapsedCompanies((prev) => ({
@@ -325,12 +365,12 @@ function App() {
   };
 
   const fetchCoursesAndCustomers = () => {
-    fetch(`/api/courses`)
+    fetchWithAuth(`/api/courses`)
       .then((res) => res.json())
       .then((data) => setCourses(Array.isArray(data) ? data : []))
       .catch((err) => console.error('Error fetching courses:', err));
 
-    fetch(`/api/customers`)
+    fetchWithAuth(`/api/customers`)
       .then((res) => res.json())
       .then((data) => setCustomers(Array.isArray(data) ? data : []))
       .catch((err) => console.error('Error fetching customers:', err));
@@ -339,8 +379,8 @@ function App() {
   const fetchGlobalData = async () => {
     try {
       const [entriesRes, emailsRes] = await Promise.all([
-        fetch(`/api/courses/entries`),
-        fetch(`/api/emails`),
+        fetchWithAuth(`/api/courses/entries`),
+        fetchWithAuth(`/api/emails`),
       ]);
       const entriesData = entriesRes.ok ? await entriesRes.json() : [];
       const messagesData = emailsRes.ok ? await emailsRes.json() : [];
@@ -354,9 +394,11 @@ function App() {
   };
 
   useEffect(() => {
-    fetchCoursesAndCustomers();
-    handleAllCourseEntries();
-  }, []);
+    if (isAuthenticated) {
+      fetchCoursesAndCustomers();
+      handleAllCourseEntries();
+    }
+  }, [isAuthenticated]);
 
   const handleCourseClick = async (courseName) => {
     setSelectedCourse(courseName);
@@ -367,8 +409,8 @@ function App() {
 
     try {
       const [entriesRes, messagesRes] = await Promise.all([
-        fetch(`/api/courses/course-entries?course_name=${encodeURIComponent(courseName)}`),
-        fetch(`/api/courses/emails?course_name=${encodeURIComponent(courseName)}`),
+        fetchWithAuth(`/api/courses/course-entries?course_name=${encodeURIComponent(courseName)}`),
+        fetchWithAuth(`/api/courses/emails?course_name=${encodeURIComponent(courseName)}`),
       ]);
 
       const entriesData = await entriesRes.json();
@@ -415,8 +457,8 @@ function App() {
 
     try {
       const [entriesRes, messagesRes] = await Promise.all([
-        fetch(`/api/customers/entries?email_address=${encodeURIComponent(email)}`),
-        fetch(`/api/customers/emails?email_address=${encodeURIComponent(email)}`),
+        fetchWithAuth(`/api/customers/entries?email_address=${encodeURIComponent(email)}`),
+        fetchWithAuth(`/api/customers/emails?email_address=${encodeURIComponent(email)}`),
       ]);
 
       const entriesData = await entriesRes.json();
@@ -475,7 +517,7 @@ function App() {
   const handleSyncData = async () => {
     setIsSyncing(true);
     try {
-      const coursesRes = await fetch(`/api/integrations/courses/import`, {
+      const coursesRes = await fetchWithAuth(`/api/integrations/courses/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -485,7 +527,7 @@ function App() {
         throw new Error(errorData.detail || 'Failed to import courses');
       }
 
-      const emailsRes = await fetch(`/api/integrations/emails/pull`, {
+      const emailsRes = await fetchWithAuth(`/api/integrations/emails/pull`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -535,7 +577,7 @@ function App() {
     setTogglingStatus(true);
 
     try {
-      const statusRes = await fetch(
+      const statusRes = await fetchWithAuth(
         `/api/emails/status?provider_message_id=${encodeURIComponent(selectedEmail.provider_message_id)}&needs_response=${newStatus}`,
         { method: 'PATCH' }
       );
@@ -563,7 +605,7 @@ function App() {
     setSendingReply(true);
 
     try {
-      const response = await fetch(`/api/integrations/send`, {
+      const response = await fetchWithAuth(`/api/integrations/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -579,7 +621,7 @@ function App() {
         throw new Error('Failed to send email');
       }
 
-      const statusRes = await fetch(
+      const statusRes = await fetchWithAuth(
         `/api/emails/status?provider_message_id=${encodeURIComponent(selectedEmail.provider_message_id)}&needs_response=false`,
         { method: 'PATCH' }
       );
@@ -609,7 +651,7 @@ function App() {
 
     setMovingEmail(true);
     try {
-      const res = await fetch(
+      const res = await fetchWithAuth(
         `/api/emails/move?provider_message_id=${encodeURIComponent(selectedEmail.provider_message_id)}&new_thread_id=${encodeURIComponent(moveThreadTarget)}`,
         { method: 'PATCH' }
       );
@@ -634,7 +676,7 @@ function App() {
     if (!selectedCustomer) return;
     setSavingCustomerNote(true);
     try {
-      const res = await fetch(
+      const res = await fetchWithAuth(
         `/api/customers/note?email_address=${encodeURIComponent(selectedCustomer)}&note_text=${encodeURIComponent(customerNote)}`,
         { method: 'PATCH' }
       );
@@ -664,7 +706,7 @@ function App() {
     if (entry.seen !== false) return; 
 
     try {
-      const res = await fetch(`/api/courses/seen?provider_message_id=${encodeURIComponent(entry.provider_message_id)}&seen_status=true`, {
+      const res = await fetchWithAuth(`/api/courses/seen?provider_message_id=${encodeURIComponent(entry.provider_message_id)}&seen_status=true`, {
         method: 'PATCH',
       });
       
@@ -693,6 +735,29 @@ function App() {
       console.error('Error marking course entry as seen:', err);
     }
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className={`app-shell theme-${theme}`} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <div className="panel" style={{ padding: '2rem', minWidth: '300px' }}>
+          <h2>Admin Access</h2>
+          <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+            <input
+              type="password"
+              placeholder="Enter ADMIN_SECRET_KEY"
+              value={secretInput}
+              onChange={(e) => setSecretInput(e.target.value)}
+              className="search-input"
+              required
+            />
+            <button type="submit" className="sync-button">
+              Unlock Dashboard
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   const q = searchQuery.trim().toLowerCase();
 
@@ -731,6 +796,9 @@ function App() {
           </button>
           <button className="sync-button" onClick={handleSyncData} disabled={isSyncing} type="button">
             {isSyncing ? 'Syncing…' : 'Sync data'}
+          </button>
+          <button className="theme-toggle" onClick={handleLogout} type="button">
+            Log out
           </button>
         </div>
       </header>
