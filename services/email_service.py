@@ -2,9 +2,11 @@ from sqlalchemy import insert
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from db import EmailMessage, Thread, Customer
-from util.email_util import extract_domain
+from db import EmailMessage
+from services import customer_service
 from logger import logger
+from util.email_util import map_emails
+from uuid import UUID
 
 from schemas import EmailIngestItem
 
@@ -29,13 +31,8 @@ def get_newest_email(db: Session) -> EmailMessage | None:
         raise
 
 
-def get_thread_messages(db: Session, thread_id: int) -> list[EmailMessage] | None:
+def get_thread_messages(db: Session, thread_id: UUID) -> list[EmailMessage] | None:
     try:
-        thread = db.query(Thread).filter_by(id=thread_id).first()
-        if not thread:
-            logger.warning(f"Thread '{thread_id}' not found when fetching messages.")
-            return None
-
         messages = db.query(EmailMessage).filter_by(thread_id=thread_id).all()
         logger.info(f"Retrieved {len(messages)} messages for thread_id '{thread_id}'.")
         return messages
@@ -44,89 +41,45 @@ def get_thread_messages(db: Session, thread_id: int) -> list[EmailMessage] | Non
         raise
 
 
-def ingest_email_batch(db: Session, emails: list[EmailIngestItem]) -> list[EmailMessage]:
-    if not emails:
+def ingest_email_batch(db: Session, email_requests: list[EmailIngestItem]) -> list[EmailMessage]:
+    if not email_requests:
         return []
 
     try:
-        customer_emails = {item.customer_email for item in emails}
+        customer_data = [(item.customer_email, item.customer_name) for item in email_requests]
+        customer_service.add_new_customers(db, customer_data)
 
-        existing_customers = db.query(Customer).filter(Customer.email.in_(customer_emails)).all()
-        existing_emails = {c.email for c in existing_customers}
-        missing_emails = customer_emails - existing_emails
+        ids = {item.provider_message_id for item in email_requests}
+        existing_ids = {id for (id,) in db.query(EmailMessage.provider_message_id).filter(EmailMessage.provider_message_id.in_(ids)).all()}
 
-        new_customers_data = []
-        seen_in_batch = set()
+        thread_map = map_emails(email_requests, get_emails(db))
 
-        for email_data in emails:
-            email = email_data.customer_email
-            if email in missing_emails and email not in seen_in_batch:
-                seen_in_batch.add(email)
-                new_customers_data.append({
-                    "email": email,
-                    "name": email_data.customer_name,
-                    "company_domain": extract_domain(email),
-                })
-
-        if new_customers_data:
-            db.execute(insert(Customer), new_customers_data)
-
-        batch_email_ids = {item.provider_message_id for item in emails}
-        parent_ids = {item.parent_message_provider_id for item in emails if item.parent_message_provider_id}
-        all_needed_provider_ids = batch_email_ids.union(parent_ids)
-
-        existing_messages = db.query(EmailMessage).filter(
-            EmailMessage.provider_message_id.in_(all_needed_provider_ids)
-        ).all()
-        
-        message_map = {m.provider_message_id: m for m in existing_messages}
-        batch_thread_map = {pid: m.thread_id for pid, m in message_map.items()}
-
-        ingested_messages: list[EmailMessage] = []
-
-        for email_data in emails:
-            provider_message_id = email_data.provider_message_id
-
-            if provider_message_id in message_map:
-                logger.info(f"Skipping duplicate message with provider_message_id '{provider_message_id}'.")
+        new_messages: list[EmailMessage] = []
+        seen_ids = set()
+        for item in email_requests:
+            if item.provider_message_id in existing_ids or item.provider_message_id in seen_ids:
+                logger.info(f"Skipping duplicate message with provider_message_id '{item.provider_message_id}'.")
                 continue
 
-            parent_id = email_data.parent_message_provider_id
-            thread_id = None
-
-            if parent_id:
-                thread_id = batch_thread_map.get(parent_id)
-
-            if thread_id is None:
-                thread = Thread()
-                db.add(thread)
-                db.flush()
-                thread_id = thread.id
-
-            batch_thread_map[provider_message_id] = thread_id
-
             message = EmailMessage(
-                provider_message_id=provider_message_id,
-                customer_email=email_data.customer_email,
-                subject=email_data.subject,
-                body=email_data.body,
-                sent_at=email_data.sent_at,
-                needs_response=email_data.needs_response,
-                category=email_data.category,
-                thread_id=thread_id
+                provider_message_id=item.provider_message_id,
+                customer_email=item.customer_email,
+                subject=item.subject,
+                body=item.body,
+                sent_at=item.sent_at,
+                needs_response=item.needs_response,
+                category=item.category,
+                thread_id=thread_map[item.provider_message_id]
             )
+            new_messages.append(message)
+            seen_ids.add(item.provider_message_id)
 
-            db.add(message)
-            ingested_messages.append(message)
-            message_map[provider_message_id] = message
+        if new_messages:
+            db.add_all(new_messages)
+            db.commit()
+            logger.info(f"Successfully added {len(new_messages)} new emails to the database.")
 
-        db.commit()
-
-        for message in ingested_messages:
-            db.refresh(message)
-
-        logger.info(f"Successfully ingested batch of {len(ingested_messages)} email messages.")
-        return ingested_messages
+        return new_messages
 
     except (SQLAlchemyError, ValueError) as e:
         db.rollback()
@@ -142,7 +95,6 @@ def set_seen(db: Session, provider_message_id: str, seen_status: bool) -> EmailM
             return None
         message.seen = seen_status
         db.commit()
-        db.refresh(message)
         logger.info(f"Updated 'seen' to {seen_status} for message '{provider_message_id}'.")
         return message
     except SQLAlchemyError as e:
@@ -159,7 +111,6 @@ def update_email_status(db: Session, provider_message_id: str, needs_response: b
 
         message.needs_response = needs_response
         db.commit()
-        db.refresh(message)
 
         logger.info(f"Updated 'needs_response' to {needs_response} for provider_message_id '{provider_message_id}'.")
         return message
@@ -195,21 +146,15 @@ def get_email(db: Session, provider_message_id: str) -> EmailMessage | None:
         raise
 
 
-def move_email_to_thread(db: Session, provider_message_id: str, new_thread_id: int) -> EmailMessage | None:
+def move_email_to_thread(db: Session, provider_message_id: str, new_thread_id: UUID) -> EmailMessage | None:
     try:
         message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
         if not message:
             logger.warning(f"Email message '{provider_message_id}' not found when moving to new thread.")
             return None
 
-        thread = db.query(Thread).filter_by(id=new_thread_id).first()
-        if not thread:
-            logger.warning(f"Destination thread_id '{new_thread_id}' not found.")
-            return None
-
         message.thread_id = new_thread_id
         db.commit()
-        db.refresh(message)
 
         logger.info(f"Moved message '{provider_message_id}' to thread_id '{new_thread_id}'.")
         return message
@@ -219,18 +164,8 @@ def move_email_to_thread(db: Session, provider_message_id: str, new_thread_id: i
         raise
 
 
-def merge_threads(db: Session, old_thread_id: int, new_thread_id: int) -> list[EmailMessage] | None:
+def merge_threads(db: Session, old_thread_id: UUID, new_thread_id: UUID) -> list[EmailMessage] | None:
     try:
-        old_thread = db.query(Thread).filter_by(id=old_thread_id).first()
-        if not old_thread:
-            logger.warning(f"Source thread_id '{old_thread_id}' not found for merging.")
-            return None
-
-        new_thread = db.query(Thread).filter_by(id=new_thread_id).first()
-        if not new_thread:
-            logger.warning(f"Target thread_id '{new_thread_id}' not found for merging.")
-            return None
-
         moved_count = db.query(EmailMessage).filter_by(thread_id=old_thread_id).update(
             {EmailMessage.thread_id: new_thread_id},
             synchronize_session=False

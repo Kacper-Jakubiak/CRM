@@ -1,36 +1,50 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from sqlalchemy.exc import SQLAlchemyError
+from pydantic import EmailStr
 
 from util.email_util import extract_domain
 from db import Customer, CourseEntry, EmailMessage
+from sqlalchemy import insert
 from logger import logger
 
-def _get_customer_by_email(db: Session, email_address: str) -> Customer | None:
+def _get_customer_by_email(db: Session, email_address: EmailStr) -> Customer | None:
     return db.query(Customer).filter_by(email=email_address).first()
 
-def add_customer(db: Session, name: str, email_address: str) -> Customer:
+
+def add_new_customers(db: Session, customer_data: list[tuple[EmailStr, str]]) -> list[Customer]:
     try:
-        customer = _get_customer_by_email(db, email_address)
-        if customer:
-            logger.info(f"Customer '{email_address}' already exists.")
-            return customer
+        emails = {item[0] for item in customer_data}
+        
+        existing_emails = {email for (email,) in  db.query(Customer.email).filter(Customer.email.in_(emails)).all()}
 
-        domain = extract_domain(email_address)
+        new_customers: list[Customer] = []
+        seen_in_batch = set()
 
-        customer = Customer(email=email_address, name=name, company_domain=domain)
-        db.add(customer)
-        db.commit()
-        db.refresh(customer)
+        for email, name in customer_data:
+            if email in existing_emails or email in seen_in_batch:
+                continue
+            
+            customer = Customer(email=email, name=name, company_domain=extract_domain(email))
+            new_customers.append(customer)
+            seen_in_batch.add(email)
 
-        logger.info(f"Successfully added customer '{email_address}'.")
-        return customer
+        if new_customers:
+            db.add_all(new_customers)
+            db.commit()
+            logger.info(f"Successfully added {len(new_customers)} new customers to the database.")
+        else:
+            logger.info("No new customers to add; all provided emails already exist or were duplicates.")
+
+        return new_customers
+
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Failed to add customer '{email_address}': {e}", exc_info=True)
+        logger.error(f"Failed to bulk-add customers due to database error: {e}", exc_info=True)
         raise
+    
 
-def add_customer_note(db: Session, email_address: str, note_text: str) -> Customer | None:
+def add_customer_note(db: Session, email_address: EmailStr, note_text: str) -> Customer | None:
     try:
         customer = _get_customer_by_email(db, email_address)
         if customer is None:
@@ -39,7 +53,6 @@ def add_customer_note(db: Session, email_address: str, note_text: str) -> Custom
 
         customer.note = note_text
         db.commit()
-        db.refresh(customer)
 
         logger.info(f"Successfully updated note for customer '{email_address}'.")
         return customer
@@ -47,6 +60,7 @@ def add_customer_note(db: Session, email_address: str, note_text: str) -> Custom
         db.rollback()
         logger.error(f"Failed to add note for customer '{email_address}': {e}", exc_info=True)
         raise
+
 
 def get_customers(db: Session) -> list[Customer]:
     try:
@@ -57,7 +71,8 @@ def get_customers(db: Session) -> list[Customer]:
         logger.error(f"Failed to retrieve customers: {e}", exc_info=True)
         raise
 
-def get_customer_entries(db: Session, email_address: str) -> list[CourseEntry] | None:
+
+def get_customer_entries(db: Session, email_address: EmailStr) -> list[CourseEntry] | None:
     try:
         customer = _get_customer_by_email(db, email_address)
         if not customer:
@@ -78,7 +93,8 @@ def get_customer_entries(db: Session, email_address: str) -> list[CourseEntry] |
         logger.error(f"Failed to fetch course entries for '{email_address}': {e}", exc_info=True)
         raise
 
-def get_customer_messages(db: Session, email_address: str) -> list[EmailMessage] | None:
+
+def get_customer_messages(db: Session, email_address: EmailStr) -> list[EmailMessage] | None:
     try:
         customer = _get_customer_by_email(db, email_address)
         if not customer:

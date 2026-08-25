@@ -1,10 +1,13 @@
 from email.policy import default
 from email.utils import parseaddr
 import email
-from schemas import ProcessedEmail
+from schemas import ProcessedEmail, EmailIngestItem
+from db import EmailMessage
+from pydantic import EmailStr
 import hashlib
+from uuid import uuid4, UUID
 
-def process_email(msg_data) -> tuple[ProcessedEmail, list[str]]:
+def process_email(msg_data) -> ProcessedEmail:
     email_bytes = None
     for response_part in msg_data:
         if isinstance(response_part, tuple):
@@ -63,33 +66,30 @@ def process_email(msg_data) -> tuple[ProcessedEmail, list[str]]:
         subject=subject,
         body=body,
         sent_at=sent_at,
-        customer_name=customer_name
+        customer_name=customer_name,
+        references=references
     )
 
-    return email_instance, references
+    return email_instance
 
 
-def extract_message_id(msg_data) -> str:
-    """
-    Extracts the cleaned provider message ID from raw msg_data 
-    using the same email-parsing style as process_email.
-    """
-    email_bytes = None
-    for response_part in msg_data:
-        if isinstance(response_part, tuple):
-            email_bytes = response_part[1]
-            break
-    if email_bytes is None:
-        return ""
-
-    raw_msg = email.message_from_bytes(email_bytes, policy=default)
-    provider_message_id = str(raw_msg.get("Message-ID", "")).strip("<> ")
-    
-    return provider_message_id
-
-
-def extract_domain(email_address: str) -> str:
+def extract_domain(email_address: EmailStr) -> str:
     name, clean_email = parseaddr(email_address)
     domain = clean_email.split("@")[-1]
 
     return domain
+
+
+def map_emails(email_requests: list[EmailIngestItem], email_messages: list[EmailMessage]) -> dict[str, UUID]:
+    thread_map: dict[str, UUID] = {email.provider_message_id: email.thread_id for email in email_messages}
+
+    for item in email_requests:
+        for ref in reversed(item.references):
+            if ref not in thread_map:
+                continue
+            thread_map[item.provider_message_id] = thread_map[ref]
+            break
+        if item.provider_message_id not in thread_map:
+            thread_map[item.provider_message_id] = uuid4()
+
+    return thread_map

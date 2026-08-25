@@ -2,9 +2,11 @@ from datetime import datetime
 from typing import List
 import os
 
-from sqlalchemy import create_engine, ForeignKey, func, Text
+from sqlalchemy import create_engine, ForeignKey, Text, Uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 from dotenv import load_dotenv
+from uuid import UUID
+
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -16,13 +18,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 class Base(DeclarativeBase):
     pass
-
-
-# class AppConfig(Base):
-#     __tablename__ = "app_config"
-
-#     key: Mapped[str] = mapped_column(primary_key=True)
-#     value: Mapped[str] = mapped_column(nullable=False)
 
 
 class Customer(Base):
@@ -57,11 +52,10 @@ class EmailMessage(Base):
     sent_at: Mapped[datetime] = mapped_column(nullable=False)
     needs_response: Mapped[bool] = mapped_column(nullable=False)
     category: Mapped[str] = mapped_column(nullable=False)
-    thread_id: Mapped[int] = mapped_column(ForeignKey("threads.id"), index=True, nullable=False)
+    thread_id: Mapped[UUID] = mapped_column(Uuid, index=True, nullable=False)
     seen: Mapped[bool] = mapped_column(nullable=False, default=False)
 
     customer: Mapped["Customer"] = relationship("Customer", back_populates="email_messages")
-    thread: Mapped["Thread"] = relationship("Thread", back_populates="messages")
 
 
 class CourseEntry(Base):
@@ -77,12 +71,6 @@ class CourseEntry(Base):
     course: Mapped["Course"] = relationship("Course", back_populates="entries")
     customer: Mapped["Customer"] = relationship("Customer", back_populates="course_entries")
 
-
-class Thread(Base):
-    __tablename__ = "threads"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    messages: Mapped[List["EmailMessage"]] = relationship("EmailMessage", back_populates="thread", cascade="all, delete-orphan")
 
 if __name__ == "__main__":
     Base.metadata.create_all(bind=engine)

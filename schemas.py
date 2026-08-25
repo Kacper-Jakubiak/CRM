@@ -7,7 +7,7 @@ class CourseEntryRequest(BaseModel):
     course_name: str
     course_date: date
     sent_at: datetime
-    customer_name: Optional[str]
+    customer_name: str
     provider_message_id: str
 
 class CourseEntryBatchRequest(BaseModel):
@@ -75,10 +75,10 @@ class ProcessedEmail(BaseModel):
     body: str
     sent_at: datetime
     customer_name: str
+    references: list[str]
 
 
 class EmailIngestItem(ProcessedEmail):
     provider_message_id: str
     needs_response: bool
     category: str
-    parent_message_provider_id: Optional[str] = None
