@@ -742,10 +742,6 @@ function App() {
             <button className={view === 'customers' ? 'segment active' : 'segment'} onClick={() => setView('customers')} type="button">Customers</button>
           </div>
 
-          <div className="panel-header">
-            <h2>{view === 'courses' ? 'Courses' : 'Customers'}</h2>
-          </div>
-
           <div className="list-controls">
             <input
               type="search"
