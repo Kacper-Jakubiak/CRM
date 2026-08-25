@@ -14,7 +14,9 @@ class EmailClassifier:
             self.client = OpenAI()
           except Exception as e:
             logger.warning(f"Failed to log into OpenAI: {e}")
-            logger.info("AI classification skipped")
+
+        if self.client is None:
+          logger.info("AI classification skipped")
 
     def classify_category(self, process_result: ProcessedEmail) -> tuple[str, bool]:
         stripped_body_text = strip_body(process_result.body)

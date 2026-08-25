@@ -231,7 +231,7 @@ def process_new_emails(
 
         email_messages = fetch_email_messages(mail, email_ids)
 
-        use_ai = (seatch_criteria == "ALL")
+        use_ai = (seatch_criteria != "ALL")
         email_classifier = EmailClassifier(course_names, use_ai)
 
         if not email_classifier:
