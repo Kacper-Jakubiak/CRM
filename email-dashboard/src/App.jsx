@@ -56,9 +56,7 @@ function DisplayEmail({ msg, customerEmail, onSelectMessage, isSelected, onMessa
   const displayClass = msg.seen === false ? 'is-unseen' : 'is-seen';
 
   const handleClick = async () => {
-    if (onSelectMessage) {
-      onSelectMessage(msg);
-    }
+    let currentMsg = msg;
 
     if (msg.seen === false) {
       try {
@@ -68,6 +66,7 @@ function DisplayEmail({ msg, customerEmail, onSelectMessage, isSelected, onMessa
         
         if (res.ok) {
           const updatedMsg = await res.json();
+          currentMsg = updatedMsg;
           if (onMessageUpdate) {
             onMessageUpdate(updatedMsg);
           }
@@ -75,6 +74,10 @@ function DisplayEmail({ msg, customerEmail, onSelectMessage, isSelected, onMessa
       } catch (err) {
         console.error('Failed to mark email as seen:', err);
       }
+    }
+
+    if (onSelectMessage) {
+      onSelectMessage(currentMsg);
     }
   };
 
@@ -107,9 +110,13 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
   const [hasFetchedFullThread, setHasFetchedFullThread] = useState(false);
 
   useEffect(() => {
-    if (!hasFetchedFullThread) {
-      setThreadMessages(messages);
-    }
+    setThreadMessages((prevThreadMsgs) => {
+      if (!hasFetchedFullThread) return messages;
+      return prevThreadMsgs.map((m) => {
+        const updated = messages.find((p) => p.provider_message_id === m.provider_message_id);
+        return updated ? { ...m, ...updated } : m;
+      });
+    });
   }, [messages, hasFetchedFullThread]);
 
   const fetchFullThreadMessages = async () => {
@@ -601,10 +608,12 @@ function App() {
         throw new Error('Failed to update message status');
       }
 
-      const updatedMessage = {
-        ...selectedEmail,
-        needs_response: newStatus,
-      };
+      let updatedMessage;
+      try {
+        updatedMessage = await statusRes.json();
+      } catch {
+        updatedMessage = { ...selectedEmail, needs_response: newStatus };
+      }
 
       handleMessageUpdate(updatedMessage);
     } catch (err) {
@@ -645,7 +654,14 @@ function App() {
         throw new Error('Failed to update message status');
       }
 
-      handleMessageUpdate({ ...selectedEmail, needs_response: false });
+      let updatedMessage;
+      try {
+        updatedMessage = await statusRes.json();
+      } catch {
+        updatedMessage = { ...selectedEmail, needs_response: false };
+      }
+
+      handleMessageUpdate(updatedMessage);
       setReplyText('');
       setIsReplying(false);
       alert('Reply sent successfully!');
