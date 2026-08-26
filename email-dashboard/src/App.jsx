@@ -203,7 +203,7 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
   return (
     <div className="thread-card">
       <div 
-        className={`thread-header ${collapsed ? 'collapsed' : 'expanded'}`}
+        className={`thread-header`}
         onClick={handleToggleCollapse}
       >
         <h4 className={`thread-title ${threadClass}`}>

@@ -101,7 +101,7 @@ button {
 
 .dashboard-shell {
   display: grid;
-  grid-template-columns: 240px 500px minmax(0, 1fr);
+  grid-template-columns: 250px 650px minmax(0, 1fr);
   gap: 12px;
   min-height: calc(100vh - 86px);
   height: calc(100vh - 86px);
@@ -477,14 +477,10 @@ button {
   justify-content: space-between;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
-  padding: 4px 8px;
+  flex-wrap: nowrap;
+  padding: 2px 8px;
   border-left: 3px solid var(--accent);
   cursor: pointer;
-}
-
-.thread-header.expanded {
-  padding-bottom: 4px;
 }
 
 .btn-toggle-status,
@@ -504,7 +500,10 @@ button {
   border: 1px solid var(--line);
   color: var(--text);
   font-size: 0.55rem;
-  padding: 2px 5px;
+  padding: 0px 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--panel);
 }
 
@@ -518,6 +517,8 @@ button {
   white-space: nowrap;
   flex: 1;
   text-align: left;
+  font-size: 0.72rem;
+  line-height: 1;
 }
 
 .thread-count {
@@ -535,7 +536,8 @@ button {
 
 .input-target-id {
   width: 55px;
-  padding: 2px 4px;
+  padding: 0 6px;
+  height: 18px;
   font-size: 0.6rem;
   border: 1px solid var(--line);
   background: var(--panel);
