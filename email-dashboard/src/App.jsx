@@ -55,29 +55,27 @@ function DisplayEmail({ msg, customerEmail, onSelectMessage, isSelected, onMessa
   const emailAddress = customerEmail;
   const displayClass = msg.seen === false ? 'is-unseen' : 'is-seen';
 
-  const handleClick = async () => {
-    let currentMsg = msg;
-
-    if (msg.seen === false) {
-      try {
-        const res = await fetchWithAuth(`/api/emails/seen?provider_message_id=${encodeURIComponent(msg.provider_message_id)}&seen_status=true`, {
-          method: 'PATCH',
-        });
-        
-        if (res.ok) {
-          const updatedMsg = await res.json();
-          currentMsg = updatedMsg;
-          if (onMessageUpdate) {
-            onMessageUpdate(updatedMsg);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to mark email as seen:', err);
-      }
+  const handleClick = () => {
+    // 1. Immediately select and display message in detail panel
+    if (onSelectMessage) {
+      onSelectMessage(msg);
     }
 
-    if (onSelectMessage) {
-      onSelectMessage(currentMsg);
+    // 2. Asynchronously mark as seen and update thread card with returned data
+    if (msg.seen === false) {
+      fetchWithAuth(`/api/emails/seen?provider_message_id=${encodeURIComponent(msg.provider_message_id)}&seen_status=true`, {
+        method: 'PATCH',
+      })
+        .then((res) => {
+          if (res.ok) return res.json();
+          throw new Error('Failed to mark email as seen');
+        })
+        .then((updatedMsg) => {
+          if (updatedMsg && onMessageUpdate) {
+            onMessageUpdate(updatedMsg); // Updates thread card/lists only
+          }
+        })
+        .catch((err) => console.error('Failed to mark email as seen:', err));
     }
   };
 
@@ -588,8 +586,6 @@ function App() {
     setGlobalMessages((prev) => prev.map((m) => 
       m.provider_message_id === updatedMsg.provider_message_id ? { ...m, ...updatedMsg } : m
     ));
-
-    setSelectedEmail((prev) => (prev && prev.provider_message_id === updatedMsg.provider_message_id ? { ...prev, ...updatedMsg } : prev));
   };
 
   const handleToggleNeedsResponse = async () => {
@@ -615,6 +611,7 @@ function App() {
         updatedMessage = { ...selectedEmail, needs_response: newStatus };
       }
 
+      setSelectedEmail(updatedMessage);
       handleMessageUpdate(updatedMessage);
     } catch (err) {
       console.error('Error toggling status:', err);
@@ -661,6 +658,7 @@ function App() {
         updatedMessage = { ...selectedEmail, needs_response: false };
       }
 
+      setSelectedEmail(updatedMessage);
       handleMessageUpdate(updatedMessage);
       setReplyText('');
       setIsReplying(false);
