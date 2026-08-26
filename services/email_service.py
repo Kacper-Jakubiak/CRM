@@ -94,6 +94,7 @@ def set_seen(db: Session, provider_message_id: str, seen_status: bool) -> EmailM
             return None
         message.seen = seen_status
         db.commit()
+        db.refresh(message)
         logger.info(f"Updated 'seen' to {seen_status} for message '{provider_message_id}'.")
         return message
     except SQLAlchemyError as e:
@@ -110,7 +111,7 @@ def update_email_status(db: Session, provider_message_id: str, needs_response: b
 
         message.needs_response = needs_response
         db.commit()
-
+        db.refresh(message)
         logger.info(f"Updated 'needs_response' to {needs_response} for provider_message_id '{provider_message_id}'.")
         return message
     except SQLAlchemyError as e:

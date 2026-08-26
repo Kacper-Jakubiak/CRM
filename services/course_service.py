@@ -125,6 +125,7 @@ def set_seen(db: Session, provider_message_id: str, seen_status: bool) -> Course
             return None
         entry.seen = seen_status
         db.commit()
+        db.refresh(entry)
         logger.info(f"Updated 'seen' to {seen_status} for entry '{provider_message_id}'.")
         return entry
     except SQLAlchemyError as e:

@@ -53,7 +53,7 @@ def add_customer_note(db: Session, email_address: EmailStr, note_text: str) -> C
 
         customer.note = note_text
         db.commit()
-
+        db.refresh(customer)
         logger.info(f"Successfully updated note for customer '{email_address}'.")
         return customer
     except SQLAlchemyError as e:
