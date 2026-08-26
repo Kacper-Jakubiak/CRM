@@ -995,13 +995,41 @@ function App() {
               ) : (
                 <>
                   <div className="filter-header">
-                    <div>
-                      <label className="filter-label">Filter:</label>
-                      <select value={messageFilter} onChange={(e) => setMessageFilter(e.target.value)} className="filter-select">
-                        <option value="all">All</option>
-                        <option value="true">Needs Response: True</option>
-                        <option value="false">Needs Response: False</option>
-                      </select>
+                    <div className="filter-group">
+                      <span className="filter-label">Filter:</span>
+
+                      <label className="radio-label">
+                        <input
+                          type="radio"
+                          name="messageFilter"
+                          value="all"
+                          checked={messageFilter === "all"}
+                          onChange={(e) => setMessageFilter(e.target.value)}
+                        />
+                        All
+                      </label>
+
+                      <label className="radio-label">
+                        <input
+                          type="radio"
+                          name="messageFilter"
+                          value="true"
+                          checked={messageFilter === "true"}
+                          onChange={(e) => setMessageFilter(e.target.value)}
+                        />
+                        Needs Response
+                      </label>
+
+                      <label className="radio-label">
+                        <input
+                          type="radio"
+                          name="messageFilter"
+                          value="false"
+                          checked={messageFilter === "false"}
+                          onChange={(e) => setMessageFilter(e.target.value)}
+                        />
+                        Resolved
+                      </label>
                     </div>
                     <h3 className="details-subtitle no-margin">Related Messages</h3>
                   </div>
