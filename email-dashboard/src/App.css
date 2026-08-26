@@ -83,7 +83,6 @@ button {
   gap: 10px;
 }
 
-/* Force all topbar buttons (Mode, Sync, Logout, etc.) to be identical, short sizes */
 .topbar-actions button,
 .theme-toggle,
 .sync-button,
@@ -109,7 +108,7 @@ button {
 
 .dashboard-shell {
   display: grid;
-  grid-template-columns: 240px 500px minmax(0, 1fr);
+  grid-template-columns: 250px 650px minmax(0, 1fr);
   gap: 12px;
   min-height: calc(100vh - 86px);
   height: calc(100vh - 86px);
@@ -562,13 +561,6 @@ button {
   border: 1px solid var(--line);
   background: var(--panel);
   color: var(--text);
-}
-
-/* Hides arrows in Chrome, Safari, Edge, and Opera */
-.input-target-id::-webkit-outer-spin-button,
-.input-target-id::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 .unassigned-notice {
