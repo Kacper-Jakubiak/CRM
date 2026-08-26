@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f6f6f6; margin: 0; padding: 20px; }
+        .container { background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 600px; margin: auto; }
+        .content { font-size: 16px; color: #333333; line-height: 1.6; }
+        
+        .footer-logo { 
+            margin-top: 40px; 
+            padding-top: 25px; 
+            border-top: 1px solid #eeeeee; 
+            text-align: center; 
+        }
+        
+        .footer-logo svg { 
+            max-width: 350px;
+            width: 100%;
+            height: auto; 
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="content">
+            {{ message_body | replace('\n', '<br>') }}
+        </div>
+
+        <div class="footer-logo">
+            {% include 'logo.svg' %}
+        </div>
+    </div>
+</body>
+</html>

@@ -3,41 +3,17 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
 from dotenv import load_dotenv
-from jinja2 import Template
+from jinja2 import Template, Environment, FileSystemLoader
+from logger import logger
 
 load_dotenv()
 SENDER_EMAIL: str = os.getenv("CDSI_EMAIL_USER", "")
 SENDER_PASSWORD: str = os.getenv("CDSI_EMAIL_PASSWORD", "")
 
-
 SMTP_SERVER = "poczta.agh.edu.pl"
 SMTP_PORT = 465
-
-
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f6f6f6; margin: 0; padding: 20px; }
-        .container { background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 600px; margin: auto; }
-        .content { font-size: 16px; color: #333333; line-height: 1.6; }
-        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eeeeee; font-size: 12px; color: #999999; text-align: center; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="content">
-            {{ message_body | replace('\n', '<br>') }}
-        </div>
-        <div class="footer">
-            <p>Sent via Automated System</p>
-        </div>
-    </div>
-</body>
-</html>
-"""
+jinja_env = Environment(loader=FileSystemLoader('integrations/'))
+template = jinja_env.get_template('email_template.html')
 
 def send_email(
     recipient_email: str,
@@ -59,9 +35,8 @@ def send_email(
     msg.attach(MIMEText(body, "plain"))
 
     if add_html:
-        template = Template(HTML_TEMPLATE)
-        html_content = template.render(message_body=body)
-        msg.attach(MIMEText(html_content, "html"))
+        output_html = template.render(message_body=body)
+        msg.attach(MIMEText(output_html, "html"))
 
     try:
         logger.info(f"Connecting to SMTP server {SMTP_SERVER}:{SMTP_PORT}...")

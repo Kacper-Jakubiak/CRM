@@ -251,8 +251,8 @@ function ThreadCard({ threadId, messages, onMessageUpdate, onThreadMoved, onSele
 
 function MessageThreadList({ messages, messageFilter, onMessageUpdate, onThreadMoved, onSelectMessage, selectedEmail }) {
   const filteredMessages = messages.filter((msg) => {
-    if (messageFilter === 'true') return msg.needs_response === true;
-    if (messageFilter === 'false') return msg.needs_response === false;
+    if (messageFilter === 'no' || messageFilter === 'true') return msg.needs_response === true;
+    if (messageFilter === 'yes' || messageFilter === 'false') return msg.needs_response === false;
     return true;
   });
 
@@ -810,6 +810,45 @@ function App() {
     }, {})
   );
 
+  const renderFilterRadios = () => (
+    <div className="filter-group">
+      <span className="filter-label">Resolved:</span>
+
+      <label className="radio-label">
+        <input
+          type="radio"
+          name="messageFilter"
+          value="all"
+          checked={messageFilter === "all"}
+          onChange={(e) => setMessageFilter(e.target.value)}
+        />
+        All
+      </label>
+
+      <label className="radio-label">
+        <input
+          type="radio"
+          name="messageFilter"
+          value="no"
+          checked={messageFilter === "no" || messageFilter === "true"}
+          onChange={(e) => setMessageFilter(e.target.value)}
+        />
+        No
+      </label>
+
+      <label className="radio-label">
+        <input
+          type="radio"
+          name="messageFilter"
+          value="yes"
+          checked={messageFilter === "yes" || messageFilter === "false"}
+          onChange={(e) => setMessageFilter(e.target.value)}
+        />
+        Yes
+      </label>
+    </div>
+  );
+
   return (
     <div className={`app-shell theme-${theme}`}>
       <header className="topbar">
@@ -978,13 +1017,13 @@ function App() {
                           <ul className="group-entry-list">
                             {group.items.map((entry) => (
                               <li 
-                              key={entry.id} 
-                              className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}
-                              onClick={() => handleCourseEntryClick(entry)}
-                            >
-                              <div><span>Course:</span> {entry.course_name}</div>
-                              <div><span>Email:</span> {entry.customer_email}</div>
-                            </li>
+                                key={entry.id} 
+                                className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}
+                                onClick={() => handleCourseEntryClick(entry)}
+                              >
+                                <div><span>Course:</span> {entry.course_name}</div>
+                                <div><span>Email:</span> {entry.customer_email}</div>
+                              </li>
                             ))}
                           </ul>
                         </li>
@@ -995,42 +1034,7 @@ function App() {
               ) : (
                 <>
                   <div className="filter-header">
-                    <div className="filter-group">
-                      <span className="filter-label">Filter:</span>
-
-                      <label className="radio-label">
-                        <input
-                          type="radio"
-                          name="messageFilter"
-                          value="all"
-                          checked={messageFilter === "all"}
-                          onChange={(e) => setMessageFilter(e.target.value)}
-                        />
-                        All
-                      </label>
-
-                      <label className="radio-label">
-                        <input
-                          type="radio"
-                          name="messageFilter"
-                          value="true"
-                          checked={messageFilter === "true"}
-                          onChange={(e) => setMessageFilter(e.target.value)}
-                        />
-                        Needs Response
-                      </label>
-
-                      <label className="radio-label">
-                        <input
-                          type="radio"
-                          name="messageFilter"
-                          value="false"
-                          checked={messageFilter === "false"}
-                          onChange={(e) => setMessageFilter(e.target.value)}
-                        />
-                        Resolved
-                      </label>
-                    </div>
+                    {renderFilterRadios()}
                     <h3 className="details-subtitle no-margin">Related Messages</h3>
                   </div>
 
@@ -1107,14 +1111,7 @@ function App() {
               {middleView === 'emails' ? (
                 <>
                   <div className="filter-header compact-header">
-                    <div>
-                      <label className="filter-label">Filter:</label>
-                      <select value={messageFilter} onChange={(e) => setMessageFilter(e.target.value)} className="filter-select">
-                        <option value="all">All</option>
-                        <option value="true">Needs Response: True</option>
-                        <option value="false">Needs Response: False</option>
-                      </select>
-                    </div>
+                    {renderFilterRadios()}
                     <h3 className="details-subtitle no-margin">Messages</h3>
                   </div>
 
@@ -1142,13 +1139,13 @@ function App() {
                           <ul className="group-entry-list">
                             {group.items.map((entry) => (
                               <li 
-                              key={entry.id} 
-                              className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}
-                              onClick={() => handleCourseEntryClick(entry)}
-                            >
-                              <div><span>Course:</span> {entry.course_name}</div>
-                              <div><span>Email:</span> {entry.customer_email}</div>
-                            </li>
+                                key={entry.id} 
+                                className={`entry-item ${entry.seen === false ? 'is-unseen' : 'is-seen'}`}
+                                onClick={() => handleCourseEntryClick(entry)}
+                              >
+                                <div><span>Course:</span> {entry.course_name}</div>
+                                <div><span>Email:</span> {entry.customer_email}</div>
+                              </li>
                             ))}
                           </ul>
                         </li>
