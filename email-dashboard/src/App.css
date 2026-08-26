@@ -101,7 +101,7 @@ button {
 
 .dashboard-shell {
   display: grid;
-  grid-template-columns: 240px minmax(450px, 500px) minmax(500px, 1fr);
+  grid-template-columns: 240px 500px minmax(0, 1fr);
   gap: 12px;
   min-height: calc(100vh - 86px);
   height: calc(100vh - 86px);
