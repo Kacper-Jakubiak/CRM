@@ -445,6 +445,7 @@ button {
   margin-bottom: 8px;
   padding: 0;
   overflow: hidden;
+  max-width: 90%;
 }
 
 .thread-header {
