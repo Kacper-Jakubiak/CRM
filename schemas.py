@@ -1,7 +1,6 @@
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field, AliasPath
 from datetime import datetime, date
-from uuid import UUID
 
 class CourseEntryRequest(BaseModel):
     customer_email: EmailStr
@@ -62,7 +61,7 @@ class EmailMessageResponse(BaseModel):
     sent_at: datetime
     needs_response: bool
     category: str
-    thread_id: UUID
+    thread_id: int
     seen: bool
 
     class Config:

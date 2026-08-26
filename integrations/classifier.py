@@ -4,13 +4,16 @@ from openai import OpenAI
 from pydantic import BaseModel
 from schemas import ProcessedEmail
 from logger import logger
+from dotenv import load_dotenv
+
 
 class EmailClassifier:
-    def __init__(self, course_names: list[str], should_use_AI: bool = True):
+    def __init__(self, course_names: list[str] = [], should_use_AI: bool = True):
         self.course_names = course_names
         self.client = None
         if should_use_AI:
           try:
+            load_dotenv()
             self.client = OpenAI()
           except Exception as e:
             logger.warning(f"Failed to log into OpenAI: {e}")

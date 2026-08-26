@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from uuid import UUID
 from dependencies import get_db
 from schemas import EmailMessageResponse
 from services import email_service
@@ -37,7 +36,7 @@ def update_all_emails(needs_response: bool, db: Session = Depends(get_db)):
 
 
 @router.patch("/threads/merge", response_model=list[EmailMessageResponse])
-def merge_threads(old_thread_id: UUID, new_thread_id: UUID, db: Session = Depends(get_db)):
+def merge_threads(old_thread_id: int, new_thread_id: int, db: Session = Depends(get_db)):
     try:
         email_messages = email_service.merge_threads(
             db=db,
@@ -60,7 +59,7 @@ def merge_threads(old_thread_id: UUID, new_thread_id: UUID, db: Session = Depend
 
 
 @router.get("/thread-messages", response_model=list[EmailMessageResponse])
-def get_thread_messages(thread_id: UUID, db: Session = Depends(get_db)):
+def get_thread_messages(thread_id: int, db: Session = Depends(get_db)):
     try:
         email_messages = email_service.get_thread_messages(db=db, thread_id=thread_id)
     except SQLAlchemyError:
@@ -144,7 +143,7 @@ def update_message_seen(provider_message_id: str, seen_status: bool, db: Session
 
 
 @router.patch("/move", response_model=EmailMessageResponse)
-def move_message_to_thread(provider_message_id: str, new_thread_id: UUID, db: Session = Depends(get_db)):
+def move_message_to_thread(provider_message_id: str, new_thread_id: int, db: Session = Depends(get_db)):
     try:
         email_message = email_service.move_email_to_thread(
             db=db,

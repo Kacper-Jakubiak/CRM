@@ -6,7 +6,6 @@ from db import EmailMessage
 from services import customer_service
 from logger import logger
 from util.email_util import map_emails
-from uuid import UUID
 
 from schemas import EmailIngestItem
 
@@ -31,7 +30,7 @@ def get_newest_email(db: Session) -> EmailMessage | None:
         raise
 
 
-def get_thread_messages(db: Session, thread_id: UUID) -> list[EmailMessage] | None:
+def get_thread_messages(db: Session, thread_id: int) -> list[EmailMessage] | None:
     try:
         messages = db.query(EmailMessage).filter_by(thread_id=thread_id).all()
         logger.info(f"Retrieved {len(messages)} messages for thread_id '{thread_id}'.")
@@ -146,7 +145,7 @@ def get_email(db: Session, provider_message_id: str) -> EmailMessage | None:
         raise
 
 
-def move_email_to_thread(db: Session, provider_message_id: str, new_thread_id: UUID) -> EmailMessage | None:
+def move_email_to_thread(db: Session, provider_message_id: str, new_thread_id: int) -> EmailMessage | None:
     try:
         message = db.query(EmailMessage).filter_by(provider_message_id=provider_message_id).first()
         if not message:
@@ -164,7 +163,7 @@ def move_email_to_thread(db: Session, provider_message_id: str, new_thread_id: U
         raise
 
 
-def merge_threads(db: Session, old_thread_id: UUID, new_thread_id: UUID) -> list[EmailMessage] | None:
+def merge_threads(db: Session, old_thread_id: int, new_thread_id: int) -> list[EmailMessage] | None:
     try:
         moved_count = db.query(EmailMessage).filter_by(thread_id=old_thread_id).update(
             {EmailMessage.thread_id: new_thread_id},

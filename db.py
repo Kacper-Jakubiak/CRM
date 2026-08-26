@@ -2,10 +2,9 @@ from datetime import datetime
 from typing import List
 import os
 
-from sqlalchemy import create_engine, ForeignKey, Text, Uuid
+from sqlalchemy import create_engine, ForeignKey, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 from dotenv import load_dotenv
-from uuid import UUID
 
 
 load_dotenv()
@@ -52,7 +51,7 @@ class EmailMessage(Base):
     sent_at: Mapped[datetime] = mapped_column(nullable=False)
     needs_response: Mapped[bool] = mapped_column(nullable=False)
     category: Mapped[str] = mapped_column(nullable=False)
-    thread_id: Mapped[UUID] = mapped_column(Uuid, index=True, nullable=False)
+    thread_id: Mapped[int] = mapped_column(index=True, nullable=False)
     seen: Mapped[bool] = mapped_column(nullable=False, default=False)
 
     customer: Mapped["Customer"] = relationship("Customer", back_populates="email_messages")

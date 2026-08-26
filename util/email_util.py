@@ -5,7 +5,6 @@ from schemas import ProcessedEmail, EmailIngestItem
 from db import EmailMessage
 from pydantic import EmailStr
 import hashlib
-from uuid import uuid4, UUID
 
 def process_email(msg_data) -> ProcessedEmail:
     email_bytes = None
@@ -80,8 +79,9 @@ def extract_domain(email_address: EmailStr) -> str:
     return domain
 
 
-def map_emails(email_requests: list[EmailIngestItem], email_messages: list[EmailMessage]) -> dict[str, UUID]:
-    thread_map: dict[str, UUID] = {email.provider_message_id: email.thread_id for email in email_messages}
+def map_emails(email_requests: list[EmailIngestItem], email_messages: list[EmailMessage]) -> dict[str, int]:
+    thread_map: dict[str, int] = {email.provider_message_id: email.thread_id for email in email_messages}
+    next_id = max(thread_map.values()) + 1 if thread_map else 0
 
     for item in email_requests:
         for ref in reversed(item.references):
@@ -90,6 +90,7 @@ def map_emails(email_requests: list[EmailIngestItem], email_messages: list[Email
             thread_map[item.provider_message_id] = thread_map[ref]
             break
         if item.provider_message_id not in thread_map:
-            thread_map[item.provider_message_id] = uuid4()
+            thread_map[item.provider_message_id] = next_id
+            next_id += 1
 
     return thread_map
